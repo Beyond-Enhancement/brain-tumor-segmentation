@@ -1,0 +1,24 @@
+<!doctype html><meta charset=utf-8><body><pre id=o></pre>
+<script type=module>
+// Runs the dynamic-shape real networks on WebGPU and compares with the CPU reference.
+const log = (...a) => { document.getElementById('o').textContent += a.join(' ') + '\n'; console.log(...a); };
+try {
+  const ort = await import('/vendor/ort/ort.webgpu.bundle.min.mjs');
+  ort.env.wasm.wasmPaths = { wasm: '/vendor/ort/ort-wasm-simd-threaded.asyncify.wasm' };
+  const a = await navigator.gpu.requestAdapter(); log('adapter', a.info.vendor, a.info.architecture);
+  for (const [name, shape] of [['hdglio', [1, 4, 64, 64, 64]], ['hdbet', [1, 1, 32, 64, 64]]]) {
+    const get = async f => new Uint8Array(await (await fetch('/dyn/' + f)).arrayBuffer());
+    const s = await ort.InferenceSession.create(await get(name + '_dyn.onnx'), { executionProviders: ['webgpu'], logSeverityLevel: 2 });
+    const x = new Float32Array((await get(name + '_x.raw')).buffer), yr = new Float32Array((await get(name + '_y.raw')).buffer);
+    const t = performance.now();
+    const out = await s.run({ input: new ort.Tensor('float32', x, shape) });
+    const y = out.output.data;
+    let md = 0, ms = 0; for (let i = 0; i < y.length; i++) { const d = Math.abs(y[i] - yr[i]); if (d > md) md = d; ms += d; }
+    // argmax agreement over classes
+    const K = out.output.dims[1], n = y.length / K; let agree = 0;
+    for (let v = 0; v < n; v++) { let b1 = 0, b2 = 0; for (let k = 1; k < K; k++) { if (y[k * n + v] > y[b1 * n + v]) b1 = k; if (yr[k * n + v] > yr[b2 * n + v]) b2 = k; } agree += b1 === b2; }
+    log(name, 'webgpu ms', (performance.now() - t).toFixed(0), 'max abs diff', md.toExponential(2), 'mean', (ms / y.length).toExponential(2), 'argmax agreement', (100 * agree / n).toFixed(3) + '%');
+  }
+} catch (e) { log('ERROR', e.stack || e); }
+log('DONE');
+</script>

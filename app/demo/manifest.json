@@ -1,0 +1,4 @@
+[
+  {"id": "tcga-fg-6692", "title": "TCGA-FG-6692", "subtitle": "Right frontal enhancing glioma (TCIA, CC BY 3.0)",
+   "files": {"T1": "tcga-fg-6692/t1.nii.gz", "T1c": "tcga-fg-6692/t1c.nii.gz", "T2": "tcga-fg-6692/t2.nii.gz", "FLAIR": "tcga-fg-6692/flair.nii.gz"}}
+]
