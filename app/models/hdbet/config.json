@@ -1,0 +1,923 @@
+{
+ "name": "HD-BET",
+ "version": "2.0, v1.5 parameters (Zenodo 14445620)",
+ "nnunet": 2,
+ "configuration": "3d_fullres_1x1x1_ps96x192x192_bs8",
+ "inputChannels": [
+  "image"
+ ],
+ "numClasses": 2,
+ "regionBased": false,
+ "transposeForward": [
+  0,
+  1,
+  2
+ ],
+ "transposeBackward": [
+  0,
+  1,
+  2
+ ],
+ "targetSpacing": [
+  1.0,
+  1.0,
+  1.0
+ ],
+ "patchSize": [
+  96,
+  192,
+  192
+ ],
+ "normalization": [
+  {
+   "scheme": "ZScoreNormalization",
+   "useMask": false
+  }
+ ],
+ "mirrorAxes": [
+  0,
+  1,
+  2
+ ],
+ "stepSize": 0.5,
+ "aggregate": "logits",
+ "anisotropyThreshold": 3,
+ "resampleData": {
+  "order": 3,
+  "orderZ": 0
+ },
+ "resampleProb": {
+  "order": 1,
+  "orderZ": 0
+ },
+ "postprocessing": null,
+ "onnx": "model.onnx",
+ "weights": {
+  "pack": "weights.pack",
+  "externalName": "weights.bin",
+  "externalBytes": 123137800,
+  "tensors": [
+   {
+    "name": "encoder.stages.0.0.convs.0.conv.weight",
+    "offset": 0,
+    "bytes": 3456,
+    "count": 864,
+    "fmt": "q8",
+    "channels": 32,
+    "pack": 0,
+    "scales": 864
+   },
+   {
+    "name": "encoder.stages.0.0.convs.0.conv.bias",
+    "offset": 3456,
+    "bytes": 128,
+    "count": 32,
+    "fmt": "f16",
+    "pack": 992
+   },
+   {
+    "name": "encoder.stages.0.0.convs.0.norm.weight",
+    "offset": 3584,
+    "bytes": 128,
+    "count": 32,
+    "fmt": "f16",
+    "pack": 1056
+   },
+   {
+    "name": "encoder.stages.0.0.convs.0.norm.bias",
+    "offset": 3712,
+    "bytes": 128,
+    "count": 32,
+    "fmt": "f16",
+    "pack": 1120
+   },
+   {
+    "name": "encoder.stages.0.0.convs.1.conv.weight",
+    "offset": 3840,
+    "bytes": 110592,
+    "count": 27648,
+    "fmt": "q8",
+    "channels": 32,
+    "pack": 1184,
+    "scales": 28832
+   },
+   {
+    "name": "encoder.stages.0.0.convs.1.conv.bias",
+    "offset": 114432,
+    "bytes": 128,
+    "count": 32,
+    "fmt": "f16",
+    "pack": 28960
+   },
+   {
+    "name": "encoder.stages.0.0.convs.1.norm.weight",
+    "offset": 114560,
+    "bytes": 128,
+    "count": 32,
+    "fmt": "f16",
+    "pack": 29024
+   },
+   {
+    "name": "encoder.stages.0.0.convs.1.norm.bias",
+    "offset": 114688,
+    "bytes": 128,
+    "count": 32,
+    "fmt": "f16",
+    "pack": 29088
+   },
+   {
+    "name": "encoder.stages.1.0.convs.0.conv.weight",
+    "offset": 114816,
+    "bytes": 221184,
+    "count": 55296,
+    "fmt": "q8",
+    "channels": 64,
+    "pack": 29152,
+    "scales": 84448
+   },
+   {
+    "name": "encoder.stages.1.0.convs.0.conv.bias",
+    "offset": 336000,
+    "bytes": 256,
+    "count": 64,
+    "fmt": "f16",
+    "pack": 84704
+   },
+   {
+    "name": "encoder.stages.1.0.convs.0.norm.weight",
+    "offset": 336256,
+    "bytes": 256,
+    "count": 64,
+    "fmt": "f16",
+    "pack": 84832
+   },
+   {
+    "name": "encoder.stages.1.0.convs.0.norm.bias",
+    "offset": 336512,
+    "bytes": 256,
+    "count": 64,
+    "fmt": "f16",
+    "pack": 84960
+   },
+   {
+    "name": "encoder.stages.1.0.convs.1.conv.weight",
+    "offset": 336768,
+    "bytes": 442368,
+    "count": 110592,
+    "fmt": "q8",
+    "channels": 64,
+    "pack": 85088,
+    "scales": 195680
+   },
+   {
+    "name": "encoder.stages.1.0.convs.1.conv.bias",
+    "offset": 779136,
+    "bytes": 256,
+    "count": 64,
+    "fmt": "f16",
+    "pack": 195936
+   },
+   {
+    "name": "encoder.stages.1.0.convs.1.norm.weight",
+    "offset": 779392,
+    "bytes": 256,
+    "count": 64,
+    "fmt": "f16",
+    "pack": 196064
+   },
+   {
+    "name": "encoder.stages.1.0.convs.1.norm.bias",
+    "offset": 779648,
+    "bytes": 256,
+    "count": 64,
+    "fmt": "f16",
+    "pack": 196192
+   },
+   {
+    "name": "encoder.stages.2.0.convs.0.conv.weight",
+    "offset": 779904,
+    "bytes": 884736,
+    "count": 221184,
+    "fmt": "q8",
+    "channels": 128,
+    "pack": 196320,
+    "scales": 417504
+   },
+   {
+    "name": "encoder.stages.2.0.convs.0.conv.bias",
+    "offset": 1664640,
+    "bytes": 512,
+    "count": 128,
+    "fmt": "f16",
+    "pack": 418016
+   },
+   {
+    "name": "encoder.stages.2.0.convs.0.norm.weight",
+    "offset": 1665152,
+    "bytes": 512,
+    "count": 128,
+    "fmt": "f16",
+    "pack": 418272
+   },
+   {
+    "name": "encoder.stages.2.0.convs.0.norm.bias",
+    "offset": 1665664,
+    "bytes": 512,
+    "count": 128,
+    "fmt": "f16",
+    "pack": 418528
+   },
+   {
+    "name": "encoder.stages.2.0.convs.1.conv.weight",
+    "offset": 1666176,
+    "bytes": 1769472,
+    "count": 442368,
+    "fmt": "q8",
+    "channels": 128,
+    "pack": 418784,
+    "scales": 861152
+   },
+   {
+    "name": "encoder.stages.2.0.convs.1.conv.bias",
+    "offset": 3435648,
+    "bytes": 512,
+    "count": 128,
+    "fmt": "f16",
+    "pack": 861664
+   },
+   {
+    "name": "encoder.stages.2.0.convs.1.norm.weight",
+    "offset": 3436160,
+    "bytes": 512,
+    "count": 128,
+    "fmt": "f16",
+    "pack": 861920
+   },
+   {
+    "name": "encoder.stages.2.0.convs.1.norm.bias",
+    "offset": 3436672,
+    "bytes": 512,
+    "count": 128,
+    "fmt": "f16",
+    "pack": 862176
+   },
+   {
+    "name": "encoder.stages.3.0.convs.0.conv.weight",
+    "offset": 3437184,
+    "bytes": 3538944,
+    "count": 884736,
+    "fmt": "q8",
+    "channels": 256,
+    "pack": 862432,
+    "scales": 1747168
+   },
+   {
+    "name": "encoder.stages.3.0.convs.0.conv.bias",
+    "offset": 6976128,
+    "bytes": 1024,
+    "count": 256,
+    "fmt": "f16",
+    "pack": 1748192
+   },
+   {
+    "name": "encoder.stages.3.0.convs.0.norm.weight",
+    "offset": 6977152,
+    "bytes": 1024,
+    "count": 256,
+    "fmt": "f16",
+    "pack": 1748704
+   },
+   {
+    "name": "encoder.stages.3.0.convs.0.norm.bias",
+    "offset": 6978176,
+    "bytes": 1024,
+    "count": 256,
+    "fmt": "f16",
+    "pack": 1749216
+   },
+   {
+    "name": "encoder.stages.3.0.convs.1.conv.weight",
+    "offset": 6979200,
+    "bytes": 7077888,
+    "count": 1769472,
+    "fmt": "q8",
+    "channels": 256,
+    "pack": 1749728,
+    "scales": 3519200
+   },
+   {
+    "name": "encoder.stages.3.0.convs.1.conv.bias",
+    "offset": 14057088,
+    "bytes": 1024,
+    "count": 256,
+    "fmt": "f16",
+    "pack": 3520224
+   },
+   {
+    "name": "encoder.stages.3.0.convs.1.norm.weight",
+    "offset": 14058112,
+    "bytes": 1024,
+    "count": 256,
+    "fmt": "f16",
+    "pack": 3520736
+   },
+   {
+    "name": "encoder.stages.3.0.convs.1.norm.bias",
+    "offset": 14059136,
+    "bytes": 1024,
+    "count": 256,
+    "fmt": "f16",
+    "pack": 3521248
+   },
+   {
+    "name": "encoder.stages.4.0.convs.0.conv.weight",
+    "offset": 14060160,
+    "bytes": 8847360,
+    "count": 2211840,
+    "fmt": "q8",
+    "channels": 320,
+    "pack": 3521760,
+    "scales": 5733600
+   },
+   {
+    "name": "encoder.stages.4.0.convs.0.conv.bias",
+    "offset": 22907520,
+    "bytes": 1280,
+    "count": 320,
+    "fmt": "f16",
+    "pack": 5734880
+   },
+   {
+    "name": "encoder.stages.4.0.convs.0.norm.weight",
+    "offset": 22908800,
+    "bytes": 1280,
+    "count": 320,
+    "fmt": "f16",
+    "pack": 5735520
+   },
+   {
+    "name": "encoder.stages.4.0.convs.0.norm.bias",
+    "offset": 22910080,
+    "bytes": 1280,
+    "count": 320,
+    "fmt": "f16",
+    "pack": 5736160
+   },
+   {
+    "name": "encoder.stages.4.0.convs.1.conv.weight",
+    "offset": 22911360,
+    "bytes": 11059200,
+    "count": 2764800,
+    "fmt": "q8",
+    "channels": 320,
+    "pack": 5736800,
+    "scales": 8501600
+   },
+   {
+    "name": "encoder.stages.4.0.convs.1.conv.bias",
+    "offset": 33970560,
+    "bytes": 1280,
+    "count": 320,
+    "fmt": "f16",
+    "pack": 8502880
+   },
+   {
+    "name": "encoder.stages.4.0.convs.1.norm.weight",
+    "offset": 33971840,
+    "bytes": 1280,
+    "count": 320,
+    "fmt": "f16",
+    "pack": 8503520
+   },
+   {
+    "name": "encoder.stages.4.0.convs.1.norm.bias",
+    "offset": 33973120,
+    "bytes": 1280,
+    "count": 320,
+    "fmt": "f16",
+    "pack": 8504160
+   },
+   {
+    "name": "encoder.stages.5.0.convs.0.conv.weight",
+    "offset": 33974400,
+    "bytes": 11059200,
+    "count": 2764800,
+    "fmt": "q8",
+    "channels": 320,
+    "pack": 8504800,
+    "scales": 11269600
+   },
+   {
+    "name": "encoder.stages.5.0.convs.0.conv.bias",
+    "offset": 45033600,
+    "bytes": 1280,
+    "count": 320,
+    "fmt": "f16",
+    "pack": 11270880
+   },
+   {
+    "name": "encoder.stages.5.0.convs.0.norm.weight",
+    "offset": 45034880,
+    "bytes": 1280,
+    "count": 320,
+    "fmt": "f16",
+    "pack": 11271520
+   },
+   {
+    "name": "encoder.stages.5.0.convs.0.norm.bias",
+    "offset": 45036160,
+    "bytes": 1280,
+    "count": 320,
+    "fmt": "f16",
+    "pack": 11272160
+   },
+   {
+    "name": "encoder.stages.5.0.convs.1.conv.weight",
+    "offset": 45037440,
+    "bytes": 11059200,
+    "count": 2764800,
+    "fmt": "q8",
+    "channels": 320,
+    "pack": 11272800,
+    "scales": 14037600
+   },
+   {
+    "name": "encoder.stages.5.0.convs.1.conv.bias",
+    "offset": 56096640,
+    "bytes": 1280,
+    "count": 320,
+    "fmt": "f16",
+    "pack": 14038880
+   },
+   {
+    "name": "encoder.stages.5.0.convs.1.norm.weight",
+    "offset": 56097920,
+    "bytes": 1280,
+    "count": 320,
+    "fmt": "f16",
+    "pack": 14039520
+   },
+   {
+    "name": "encoder.stages.5.0.convs.1.norm.bias",
+    "offset": 56099200,
+    "bytes": 1280,
+    "count": 320,
+    "fmt": "f16",
+    "pack": 14040160
+   },
+   {
+    "name": "decoder.stages.0.convs.0.conv.weight",
+    "offset": 56100480,
+    "bytes": 22118400,
+    "count": 5529600,
+    "fmt": "q8",
+    "channels": 320,
+    "pack": 14040800,
+    "scales": 19570400
+   },
+   {
+    "name": "decoder.stages.0.convs.0.conv.bias",
+    "offset": 78218880,
+    "bytes": 1280,
+    "count": 320,
+    "fmt": "f16",
+    "pack": 19571680
+   },
+   {
+    "name": "decoder.stages.0.convs.0.norm.weight",
+    "offset": 78220160,
+    "bytes": 1280,
+    "count": 320,
+    "fmt": "f16",
+    "pack": 19572320
+   },
+   {
+    "name": "decoder.stages.0.convs.0.norm.bias",
+    "offset": 78221440,
+    "bytes": 1280,
+    "count": 320,
+    "fmt": "f16",
+    "pack": 19572960
+   },
+   {
+    "name": "decoder.stages.0.convs.1.conv.weight",
+    "offset": 78222720,
+    "bytes": 11059200,
+    "count": 2764800,
+    "fmt": "q8",
+    "channels": 320,
+    "pack": 19573600,
+    "scales": 22338400
+   },
+   {
+    "name": "decoder.stages.0.convs.1.conv.bias",
+    "offset": 89281920,
+    "bytes": 1280,
+    "count": 320,
+    "fmt": "f16",
+    "pack": 22339680
+   },
+   {
+    "name": "decoder.stages.0.convs.1.norm.weight",
+    "offset": 89283200,
+    "bytes": 1280,
+    "count": 320,
+    "fmt": "f16",
+    "pack": 22340320
+   },
+   {
+    "name": "decoder.stages.0.convs.1.norm.bias",
+    "offset": 89284480,
+    "bytes": 1280,
+    "count": 320,
+    "fmt": "f16",
+    "pack": 22340960
+   },
+   {
+    "name": "decoder.stages.1.convs.0.conv.weight",
+    "offset": 89285760,
+    "bytes": 14155776,
+    "count": 3538944,
+    "fmt": "q8",
+    "channels": 256,
+    "pack": 22341600,
+    "scales": 25880544
+   },
+   {
+    "name": "decoder.stages.1.convs.0.conv.bias",
+    "offset": 103441536,
+    "bytes": 1024,
+    "count": 256,
+    "fmt": "f16",
+    "pack": 25881568
+   },
+   {
+    "name": "decoder.stages.1.convs.0.norm.weight",
+    "offset": 103442560,
+    "bytes": 1024,
+    "count": 256,
+    "fmt": "f16",
+    "pack": 25882080
+   },
+   {
+    "name": "decoder.stages.1.convs.0.norm.bias",
+    "offset": 103443584,
+    "bytes": 1024,
+    "count": 256,
+    "fmt": "f16",
+    "pack": 25882592
+   },
+   {
+    "name": "decoder.stages.1.convs.1.conv.weight",
+    "offset": 103444608,
+    "bytes": 7077888,
+    "count": 1769472,
+    "fmt": "q8",
+    "channels": 256,
+    "pack": 25883104,
+    "scales": 27652576
+   },
+   {
+    "name": "decoder.stages.1.convs.1.conv.bias",
+    "offset": 110522496,
+    "bytes": 1024,
+    "count": 256,
+    "fmt": "f16",
+    "pack": 27653600
+   },
+   {
+    "name": "decoder.stages.1.convs.1.norm.weight",
+    "offset": 110523520,
+    "bytes": 1024,
+    "count": 256,
+    "fmt": "f16",
+    "pack": 27654112
+   },
+   {
+    "name": "decoder.stages.1.convs.1.norm.bias",
+    "offset": 110524544,
+    "bytes": 1024,
+    "count": 256,
+    "fmt": "f16",
+    "pack": 27654624
+   },
+   {
+    "name": "decoder.stages.2.convs.0.conv.weight",
+    "offset": 110525568,
+    "bytes": 3538944,
+    "count": 884736,
+    "fmt": "q8",
+    "channels": 128,
+    "pack": 27655136,
+    "scales": 28539872
+   },
+   {
+    "name": "decoder.stages.2.convs.0.conv.bias",
+    "offset": 114064512,
+    "bytes": 512,
+    "count": 128,
+    "fmt": "f16",
+    "pack": 28540384
+   },
+   {
+    "name": "decoder.stages.2.convs.0.norm.weight",
+    "offset": 114065024,
+    "bytes": 512,
+    "count": 128,
+    "fmt": "f16",
+    "pack": 28540640
+   },
+   {
+    "name": "decoder.stages.2.convs.0.norm.bias",
+    "offset": 114065536,
+    "bytes": 512,
+    "count": 128,
+    "fmt": "f16",
+    "pack": 28540896
+   },
+   {
+    "name": "decoder.stages.2.convs.1.conv.weight",
+    "offset": 114066048,
+    "bytes": 1769472,
+    "count": 442368,
+    "fmt": "q8",
+    "channels": 128,
+    "pack": 28541152,
+    "scales": 28983520
+   },
+   {
+    "name": "decoder.stages.2.convs.1.conv.bias",
+    "offset": 115835520,
+    "bytes": 512,
+    "count": 128,
+    "fmt": "f16",
+    "pack": 28984032
+   },
+   {
+    "name": "decoder.stages.2.convs.1.norm.weight",
+    "offset": 115836032,
+    "bytes": 512,
+    "count": 128,
+    "fmt": "f16",
+    "pack": 28984288
+   },
+   {
+    "name": "decoder.stages.2.convs.1.norm.bias",
+    "offset": 115836544,
+    "bytes": 512,
+    "count": 128,
+    "fmt": "f16",
+    "pack": 28984544
+   },
+   {
+    "name": "decoder.stages.3.convs.0.conv.weight",
+    "offset": 115837056,
+    "bytes": 884736,
+    "count": 221184,
+    "fmt": "q8",
+    "channels": 64,
+    "pack": 28984800,
+    "scales": 29205984
+   },
+   {
+    "name": "decoder.stages.3.convs.0.conv.bias",
+    "offset": 116721792,
+    "bytes": 256,
+    "count": 64,
+    "fmt": "f16",
+    "pack": 29206240
+   },
+   {
+    "name": "decoder.stages.3.convs.0.norm.weight",
+    "offset": 116722048,
+    "bytes": 256,
+    "count": 64,
+    "fmt": "f16",
+    "pack": 29206368
+   },
+   {
+    "name": "decoder.stages.3.convs.0.norm.bias",
+    "offset": 116722304,
+    "bytes": 256,
+    "count": 64,
+    "fmt": "f16",
+    "pack": 29206496
+   },
+   {
+    "name": "decoder.stages.3.convs.1.conv.weight",
+    "offset": 116722560,
+    "bytes": 442368,
+    "count": 110592,
+    "fmt": "q8",
+    "channels": 64,
+    "pack": 29206624,
+    "scales": 29317216
+   },
+   {
+    "name": "decoder.stages.3.convs.1.conv.bias",
+    "offset": 117164928,
+    "bytes": 256,
+    "count": 64,
+    "fmt": "f16",
+    "pack": 29317472
+   },
+   {
+    "name": "decoder.stages.3.convs.1.norm.weight",
+    "offset": 117165184,
+    "bytes": 256,
+    "count": 64,
+    "fmt": "f16",
+    "pack": 29317600
+   },
+   {
+    "name": "decoder.stages.3.convs.1.norm.bias",
+    "offset": 117165440,
+    "bytes": 256,
+    "count": 64,
+    "fmt": "f16",
+    "pack": 29317728
+   },
+   {
+    "name": "decoder.stages.4.convs.0.conv.weight",
+    "offset": 117165696,
+    "bytes": 221184,
+    "count": 55296,
+    "fmt": "q8",
+    "channels": 32,
+    "pack": 29317856,
+    "scales": 29373152
+   },
+   {
+    "name": "decoder.stages.4.convs.0.conv.bias",
+    "offset": 117386880,
+    "bytes": 128,
+    "count": 32,
+    "fmt": "f16",
+    "pack": 29373280
+   },
+   {
+    "name": "decoder.stages.4.convs.0.norm.weight",
+    "offset": 117387008,
+    "bytes": 128,
+    "count": 32,
+    "fmt": "f16",
+    "pack": 29373344
+   },
+   {
+    "name": "decoder.stages.4.convs.0.norm.bias",
+    "offset": 117387136,
+    "bytes": 128,
+    "count": 32,
+    "fmt": "f16",
+    "pack": 29373408
+   },
+   {
+    "name": "decoder.stages.4.convs.1.conv.weight",
+    "offset": 117387264,
+    "bytes": 110592,
+    "count": 27648,
+    "fmt": "q8",
+    "channels": 32,
+    "pack": 29373472,
+    "scales": 29401120
+   },
+   {
+    "name": "decoder.stages.4.convs.1.conv.bias",
+    "offset": 117497856,
+    "bytes": 128,
+    "count": 32,
+    "fmt": "f16",
+    "pack": 29401248
+   },
+   {
+    "name": "decoder.stages.4.convs.1.norm.weight",
+    "offset": 117497984,
+    "bytes": 128,
+    "count": 32,
+    "fmt": "f16",
+    "pack": 29401312
+   },
+   {
+    "name": "decoder.stages.4.convs.1.norm.bias",
+    "offset": 117498112,
+    "bytes": 128,
+    "count": 32,
+    "fmt": "f16",
+    "pack": 29401376
+   },
+   {
+    "name": "decoder.transpconvs.0.weight",
+    "offset": 117498240,
+    "bytes": 1638400,
+    "count": 409600,
+    "fmt": "q8",
+    "channels": 320,
+    "pack": 29401440,
+    "scales": 29811040
+   },
+   {
+    "name": "decoder.transpconvs.0.bias",
+    "offset": 119136640,
+    "bytes": 1280,
+    "count": 320,
+    "fmt": "f16",
+    "pack": 29812320
+   },
+   {
+    "name": "decoder.transpconvs.1.weight",
+    "offset": 119137920,
+    "bytes": 2621440,
+    "count": 655360,
+    "fmt": "q8",
+    "channels": 320,
+    "pack": 29812960,
+    "scales": 30468320
+   },
+   {
+    "name": "decoder.transpconvs.1.bias",
+    "offset": 121759360,
+    "bytes": 1024,
+    "count": 256,
+    "fmt": "f16",
+    "pack": 30469600
+   },
+   {
+    "name": "decoder.transpconvs.2.weight",
+    "offset": 121760384,
+    "bytes": 1048576,
+    "count": 262144,
+    "fmt": "q8",
+    "channels": 256,
+    "pack": 30470112,
+    "scales": 30732256
+   },
+   {
+    "name": "decoder.transpconvs.2.bias",
+    "offset": 122808960,
+    "bytes": 512,
+    "count": 128,
+    "fmt": "f16",
+    "pack": 30733280
+   },
+   {
+    "name": "decoder.transpconvs.3.weight",
+    "offset": 122809472,
+    "bytes": 262144,
+    "count": 65536,
+    "fmt": "q8",
+    "channels": 128,
+    "pack": 30733536,
+    "scales": 30799072
+   },
+   {
+    "name": "decoder.transpconvs.3.bias",
+    "offset": 123071616,
+    "bytes": 256,
+    "count": 64,
+    "fmt": "f16",
+    "pack": 30799584
+   },
+   {
+    "name": "decoder.transpconvs.4.weight",
+    "offset": 123071872,
+    "bytes": 65536,
+    "count": 16384,
+    "fmt": "q8",
+    "channels": 64,
+    "pack": 30799712,
+    "scales": 30816096
+   },
+   {
+    "name": "decoder.transpconvs.4.bias",
+    "offset": 123137408,
+    "bytes": 128,
+    "count": 32,
+    "fmt": "f16",
+    "pack": 30816352
+   },
+   {
+    "name": "decoder.seg_layers.4.weight",
+    "offset": 123137536,
+    "bytes": 256,
+    "count": 64,
+    "fmt": "q8",
+    "channels": 2,
+    "pack": 30816416,
+    "scales": 30816480
+   },
+   {
+    "name": "decoder.seg_layers.4.bias",
+    "offset": 123137792,
+    "bytes": 8,
+    "fmt": "raw",
+    "pack": 30816488
+   }
+  ],
+  "format": "q8",
+  "sha256": "563a47b6b93e159ac303cdd252c1f0c4ef9e2228ff697ed5143b89e602027b2b"
+ },
+ "labelsFromDataset": {
+  "background": 0,
+  "brain": 1
+ }
+}

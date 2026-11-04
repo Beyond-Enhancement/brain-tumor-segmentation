@@ -1,0 +1,766 @@
+
+pytorch2.15.0:Ë¶
+È
+input
+.net.conv_blocks_context.0.blocks.0.conv.weight
+,net.conv_blocks_context.0.blocks.0.conv.bias=/net/conv_blocks_context.0/blocks/blocks.0/conv/Conv_output_04/net/conv_blocks_context.0/blocks/blocks.0/conv/Conv"Conv*
+	dilations@@@ *
+group *
+kernel_shape@@@ *
+pads@@@@@@ *
+strides@@@ 
+î
+=/net/conv_blocks_context.0/blocks/blocks.0/conv/Conv_output_0
+2net.conv_blocks_context.0.blocks.0.instnorm.weight
+0net.conv_blocks_context.0.blocks.0.instnorm.biasR/net/conv_blocks_context.0/blocks/blocks.0/instnorm/InstanceNormalization_output_0I/net/conv_blocks_context.0/blocks/blocks.0/instnorm/InstanceNormalization"InstanceNormalization*
+epsilon¬Å'7 
+ñ
+R/net/conv_blocks_context.0/blocks/blocks.0/instnorm/InstanceNormalization_output_0C/net/conv_blocks_context.0/blocks/blocks.0/lrelu/LeakyRelu_output_0:/net/conv_blocks_context.0/blocks/blocks.0/lrelu/LeakyRelu"	LeakyRelu*
+alpha
+×#< 
+†
+C/net/conv_blocks_context.0/blocks/blocks.0/lrelu/LeakyRelu_output_0
+.net.conv_blocks_context.0.blocks.1.conv.weight
+,net.conv_blocks_context.0.blocks.1.conv.bias=/net/conv_blocks_context.0/blocks/blocks.1/conv/Conv_output_04/net/conv_blocks_context.0/blocks/blocks.1/conv/Conv"Conv*
+	dilations@@@ *
+group *
+kernel_shape@@@ *
+pads@@@@@@ *
+strides@@@ 
+î
+=/net/conv_blocks_context.0/blocks/blocks.1/conv/Conv_output_0
+2net.conv_blocks_context.0.blocks.1.instnorm.weight
+0net.conv_blocks_context.0.blocks.1.instnorm.biasR/net/conv_blocks_context.0/blocks/blocks.1/instnorm/InstanceNormalization_output_0I/net/conv_blocks_context.0/blocks/blocks.1/instnorm/InstanceNormalization"InstanceNormalization*
+epsilon¬Å'7 
+ñ
+R/net/conv_blocks_context.0/blocks/blocks.1/instnorm/InstanceNormalization_output_0C/net/conv_blocks_context.0/blocks/blocks.1/lrelu/LeakyRelu_output_0:/net/conv_blocks_context.0/blocks/blocks.1/lrelu/LeakyRelu"	LeakyRelu*
+alpha
+×#< 
+†
+C/net/conv_blocks_context.0/blocks/blocks.1/lrelu/LeakyRelu_output_0
+.net.conv_blocks_context.1.blocks.0.conv.weight
+,net.conv_blocks_context.1.blocks.0.conv.bias=/net/conv_blocks_context.1/blocks/blocks.0/conv/Conv_output_04/net/conv_blocks_context.1/blocks/blocks.0/conv/Conv"Conv*
+	dilations@@@ *
+group *
+kernel_shape@@@ *
+pads@@@@@@ *
+strides@@@ 
+î
+=/net/conv_blocks_context.1/blocks/blocks.0/conv/Conv_output_0
+2net.conv_blocks_context.1.blocks.0.instnorm.weight
+0net.conv_blocks_context.1.blocks.0.instnorm.biasR/net/conv_blocks_context.1/blocks/blocks.0/instnorm/InstanceNormalization_output_0I/net/conv_blocks_context.1/blocks/blocks.0/instnorm/InstanceNormalization"InstanceNormalization*
+epsilon¬Å'7 
+ñ
+R/net/conv_blocks_context.1/blocks/blocks.0/instnorm/InstanceNormalization_output_0C/net/conv_blocks_context.1/blocks/blocks.0/lrelu/LeakyRelu_output_0:/net/conv_blocks_context.1/blocks/blocks.0/lrelu/LeakyRelu"	LeakyRelu*
+alpha
+×#< 
+†
+C/net/conv_blocks_context.1/blocks/blocks.0/lrelu/LeakyRelu_output_0
+.net.conv_blocks_context.1.blocks.1.conv.weight
+,net.conv_blocks_context.1.blocks.1.conv.bias=/net/conv_blocks_context.1/blocks/blocks.1/conv/Conv_output_04/net/conv_blocks_context.1/blocks/blocks.1/conv/Conv"Conv*
+	dilations@@@ *
+group *
+kernel_shape@@@ *
+pads@@@@@@ *
+strides@@@ 
+î
+=/net/conv_blocks_context.1/blocks/blocks.1/conv/Conv_output_0
+2net.conv_blocks_context.1.blocks.1.instnorm.weight
+0net.conv_blocks_context.1.blocks.1.instnorm.biasR/net/conv_blocks_context.1/blocks/blocks.1/instnorm/InstanceNormalization_output_0I/net/conv_blocks_context.1/blocks/blocks.1/instnorm/InstanceNormalization"InstanceNormalization*
+epsilon¬Å'7 
+ñ
+R/net/conv_blocks_context.1/blocks/blocks.1/instnorm/InstanceNormalization_output_0C/net/conv_blocks_context.1/blocks/blocks.1/lrelu/LeakyRelu_output_0:/net/conv_blocks_context.1/blocks/blocks.1/lrelu/LeakyRelu"	LeakyRelu*
+alpha
+×#< 
+†
+C/net/conv_blocks_context.1/blocks/blocks.1/lrelu/LeakyRelu_output_0
+.net.conv_blocks_context.2.blocks.0.conv.weight
+,net.conv_blocks_context.2.blocks.0.conv.bias=/net/conv_blocks_context.2/blocks/blocks.0/conv/Conv_output_04/net/conv_blocks_context.2/blocks/blocks.0/conv/Conv"Conv*
+	dilations@@@ *
+group *
+kernel_shape@@@ *
+pads@@@@@@ *
+strides@@@ 
+î
+=/net/conv_blocks_context.2/blocks/blocks.0/conv/Conv_output_0
+2net.conv_blocks_context.2.blocks.0.instnorm.weight
+0net.conv_blocks_context.2.blocks.0.instnorm.biasR/net/conv_blocks_context.2/blocks/blocks.0/instnorm/InstanceNormalization_output_0I/net/conv_blocks_context.2/blocks/blocks.0/instnorm/InstanceNormalization"InstanceNormalization*
+epsilon¬Å'7 
+ñ
+R/net/conv_blocks_context.2/blocks/blocks.0/instnorm/InstanceNormalization_output_0C/net/conv_blocks_context.2/blocks/blocks.0/lrelu/LeakyRelu_output_0:/net/conv_blocks_context.2/blocks/blocks.0/lrelu/LeakyRelu"	LeakyRelu*
+alpha
+×#< 
+†
+C/net/conv_blocks_context.2/blocks/blocks.0/lrelu/LeakyRelu_output_0
+.net.conv_blocks_context.2.blocks.1.conv.weight
+,net.conv_blocks_context.2.blocks.1.conv.bias=/net/conv_blocks_context.2/blocks/blocks.1/conv/Conv_output_04/net/conv_blocks_context.2/blocks/blocks.1/conv/Conv"Conv*
+	dilations@@@ *
+group *
+kernel_shape@@@ *
+pads@@@@@@ *
+strides@@@ 
+î
+=/net/conv_blocks_context.2/blocks/blocks.1/conv/Conv_output_0
+2net.conv_blocks_context.2.blocks.1.instnorm.weight
+0net.conv_blocks_context.2.blocks.1.instnorm.biasR/net/conv_blocks_context.2/blocks/blocks.1/instnorm/InstanceNormalization_output_0I/net/conv_blocks_context.2/blocks/blocks.1/instnorm/InstanceNormalization"InstanceNormalization*
+epsilon¬Å'7 
+ñ
+R/net/conv_blocks_context.2/blocks/blocks.1/instnorm/InstanceNormalization_output_0C/net/conv_blocks_context.2/blocks/blocks.1/lrelu/LeakyRelu_output_0:/net/conv_blocks_context.2/blocks/blocks.1/lrelu/LeakyRelu"	LeakyRelu*
+alpha
+×#< 
+†
+C/net/conv_blocks_context.2/blocks/blocks.1/lrelu/LeakyRelu_output_0
+.net.conv_blocks_context.3.blocks.0.conv.weight
+,net.conv_blocks_context.3.blocks.0.conv.bias=/net/conv_blocks_context.3/blocks/blocks.0/conv/Conv_output_04/net/conv_blocks_context.3/blocks/blocks.0/conv/Conv"Conv*
+	dilations@@@ *
+group *
+kernel_shape@@@ *
+pads@@@@@@ *
+strides@@@ 
+î
+=/net/conv_blocks_context.3/blocks/blocks.0/conv/Conv_output_0
+2net.conv_blocks_context.3.blocks.0.instnorm.weight
+0net.conv_blocks_context.3.blocks.0.instnorm.biasR/net/conv_blocks_context.3/blocks/blocks.0/instnorm/InstanceNormalization_output_0I/net/conv_blocks_context.3/blocks/blocks.0/instnorm/InstanceNormalization"InstanceNormalization*
+epsilon¬Å'7 
+ñ
+R/net/conv_blocks_context.3/blocks/blocks.0/instnorm/InstanceNormalization_output_0C/net/conv_blocks_context.3/blocks/blocks.0/lrelu/LeakyRelu_output_0:/net/conv_blocks_context.3/blocks/blocks.0/lrelu/LeakyRelu"	LeakyRelu*
+alpha
+×#< 
+†
+C/net/conv_blocks_context.3/blocks/blocks.0/lrelu/LeakyRelu_output_0
+.net.conv_blocks_context.3.blocks.1.conv.weight
+,net.conv_blocks_context.3.blocks.1.conv.bias=/net/conv_blocks_context.3/blocks/blocks.1/conv/Conv_output_04/net/conv_blocks_context.3/blocks/blocks.1/conv/Conv"Conv*
+	dilations@@@ *
+group *
+kernel_shape@@@ *
+pads@@@@@@ *
+strides@@@ 
+î
+=/net/conv_blocks_context.3/blocks/blocks.1/conv/Conv_output_0
+2net.conv_blocks_context.3.blocks.1.instnorm.weight
+0net.conv_blocks_context.3.blocks.1.instnorm.biasR/net/conv_blocks_context.3/blocks/blocks.1/instnorm/InstanceNormalization_output_0I/net/conv_blocks_context.3/blocks/blocks.1/instnorm/InstanceNormalization"InstanceNormalization*
+epsilon¬Å'7 
+ñ
+R/net/conv_blocks_context.3/blocks/blocks.1/instnorm/InstanceNormalization_output_0C/net/conv_blocks_context.3/blocks/blocks.1/lrelu/LeakyRelu_output_0:/net/conv_blocks_context.3/blocks/blocks.1/lrelu/LeakyRelu"	LeakyRelu*
+alpha
+×#< 
+†
+C/net/conv_blocks_context.3/blocks/blocks.1/lrelu/LeakyRelu_output_0
+.net.conv_blocks_context.4.blocks.0.conv.weight
+,net.conv_blocks_context.4.blocks.0.conv.bias=/net/conv_blocks_context.4/blocks/blocks.0/conv/Conv_output_04/net/conv_blocks_context.4/blocks/blocks.0/conv/Conv"Conv*
+	dilations@@@ *
+group *
+kernel_shape@@@ *
+pads@@@@@@ *
+strides@@@ 
+î
+=/net/conv_blocks_context.4/blocks/blocks.0/conv/Conv_output_0
+2net.conv_blocks_context.4.blocks.0.instnorm.weight
+0net.conv_blocks_context.4.blocks.0.instnorm.biasR/net/conv_blocks_context.4/blocks/blocks.0/instnorm/InstanceNormalization_output_0I/net/conv_blocks_context.4/blocks/blocks.0/instnorm/InstanceNormalization"InstanceNormalization*
+epsilon¬Å'7 
+ñ
+R/net/conv_blocks_context.4/blocks/blocks.0/instnorm/InstanceNormalization_output_0C/net/conv_blocks_context.4/blocks/blocks.0/lrelu/LeakyRelu_output_0:/net/conv_blocks_context.4/blocks/blocks.0/lrelu/LeakyRelu"	LeakyRelu*
+alpha
+×#< 
+†
+C/net/conv_blocks_context.4/blocks/blocks.0/lrelu/LeakyRelu_output_0
+.net.conv_blocks_context.4.blocks.1.conv.weight
+,net.conv_blocks_context.4.blocks.1.conv.bias=/net/conv_blocks_context.4/blocks/blocks.1/conv/Conv_output_04/net/conv_blocks_context.4/blocks/blocks.1/conv/Conv"Conv*
+	dilations@@@ *
+group *
+kernel_shape@@@ *
+pads@@@@@@ *
+strides@@@ 
+î
+=/net/conv_blocks_context.4/blocks/blocks.1/conv/Conv_output_0
+2net.conv_blocks_context.4.blocks.1.instnorm.weight
+0net.conv_blocks_context.4.blocks.1.instnorm.biasR/net/conv_blocks_context.4/blocks/blocks.1/instnorm/InstanceNormalization_output_0I/net/conv_blocks_context.4/blocks/blocks.1/instnorm/InstanceNormalization"InstanceNormalization*
+epsilon¬Å'7 
+ñ
+R/net/conv_blocks_context.4/blocks/blocks.1/instnorm/InstanceNormalization_output_0C/net/conv_blocks_context.4/blocks/blocks.1/lrelu/LeakyRelu_output_0:/net/conv_blocks_context.4/blocks/blocks.1/lrelu/LeakyRelu"	LeakyRelu*
+alpha
+×#< 
+º
+C/net/conv_blocks_context.4/blocks/blocks.1/lrelu/LeakyRelu_output_0
+0net.conv_blocks_context.5.0.blocks.0.conv.weight
+.net.conv_blocks_context.5.0.blocks.0.conv.biasU/net/conv_blocks_context.5/conv_blocks_context.5.0/blocks/blocks.0/conv/Conv_output_0L/net/conv_blocks_context.5/conv_blocks_context.5.0/blocks/blocks.0/conv/Conv"Conv*
+	dilations@@@ *
+group *
+kernel_shape@@@ *
+pads@@@@@@ *
+strides@@@ 
+º
+U/net/conv_blocks_context.5/conv_blocks_context.5.0/blocks/blocks.0/conv/Conv_output_0
+4net.conv_blocks_context.5.0.blocks.0.instnorm.weight
+2net.conv_blocks_context.5.0.blocks.0.instnorm.biasj/net/conv_blocks_context.5/conv_blocks_context.5.0/blocks/blocks.0/instnorm/InstanceNormalization_output_0a/net/conv_blocks_context.5/conv_blocks_context.5.0/blocks/blocks.0/instnorm/InstanceNormalization"InstanceNormalization*
+epsilon¬Å'7 
+¹
+j/net/conv_blocks_context.5/conv_blocks_context.5.0/blocks/blocks.0/instnorm/InstanceNormalization_output_0[/net/conv_blocks_context.5/conv_blocks_context.5.0/blocks/blocks.0/lrelu/LeakyRelu_output_0R/net/conv_blocks_context.5/conv_blocks_context.5.0/blocks/blocks.0/lrelu/LeakyRelu"	LeakyRelu*
+alpha
+×#< 
+Ò
+[/net/conv_blocks_context.5/conv_blocks_context.5.0/blocks/blocks.0/lrelu/LeakyRelu_output_0
+0net.conv_blocks_context.5.1.blocks.0.conv.weight
+.net.conv_blocks_context.5.1.blocks.0.conv.biasU/net/conv_blocks_context.5/conv_blocks_context.5.1/blocks/blocks.0/conv/Conv_output_0L/net/conv_blocks_context.5/conv_blocks_context.5.1/blocks/blocks.0/conv/Conv"Conv*
+	dilations@@@ *
+group *
+kernel_shape@@@ *
+pads@@@@@@ *
+strides@@@ 
+º
+U/net/conv_blocks_context.5/conv_blocks_context.5.1/blocks/blocks.0/conv/Conv_output_0
+4net.conv_blocks_context.5.1.blocks.0.instnorm.weight
+2net.conv_blocks_context.5.1.blocks.0.instnorm.biasj/net/conv_blocks_context.5/conv_blocks_context.5.1/blocks/blocks.0/instnorm/InstanceNormalization_output_0a/net/conv_blocks_context.5/conv_blocks_context.5.1/blocks/blocks.0/instnorm/InstanceNormalization"InstanceNormalization*
+epsilon¬Å'7 
+¹
+j/net/conv_blocks_context.5/conv_blocks_context.5.1/blocks/blocks.0/instnorm/InstanceNormalization_output_0[/net/conv_blocks_context.5/conv_blocks_context.5.1/blocks/blocks.0/lrelu/LeakyRelu_output_0R/net/conv_blocks_context.5/conv_blocks_context.5.1/blocks/blocks.0/lrelu/LeakyRelu"	LeakyRelu*
+alpha
+×#< 
+ 
+[/net/conv_blocks_context.5/conv_blocks_context.5.1/blocks/blocks.0/lrelu/LeakyRelu_output_0
+net.tu.0.weight /net/tu.0/ConvTranspose_output_0/net/tu.0/ConvTranspose"ConvTranspose*
+	dilations@@@ *
+group *
+kernel_shape@@@ *
+pads@ @ @ @ @ @  *
+strides@@@ 
+Ÿ
+ /net/tu.0/ConvTranspose_output_0
+C/net/conv_blocks_context.4/blocks/blocks.1/lrelu/LeakyRelu_output_0/net/Concat_output_0/net/Concat"Concat*
+axis 
+©
+/net/Concat_output_0
+5net.conv_blocks_localization.0.0.blocks.0.conv.weight
+3net.conv_blocks_localization.0.0.blocks.0.conv.bias_/net/conv_blocks_localization.0/conv_blocks_localization.0.0/blocks/blocks.0/conv/Conv_output_0V/net/conv_blocks_localization.0/conv_blocks_localization.0.0/blocks/blocks.0/conv/Conv"Conv*
+	dilations@@@ *
+group *
+kernel_shape@@@ *
+pads@@@@@@ *
+strides@@@ 
+â
+_/net/conv_blocks_localization.0/conv_blocks_localization.0.0/blocks/blocks.0/conv/Conv_output_0
+9net.conv_blocks_localization.0.0.blocks.0.instnorm.weight
+7net.conv_blocks_localization.0.0.blocks.0.instnorm.biast/net/conv_blocks_localization.0/conv_blocks_localization.0.0/blocks/blocks.0/instnorm/InstanceNormalization_output_0k/net/conv_blocks_localization.0/conv_blocks_localization.0.0/blocks/blocks.0/instnorm/InstanceNormalization"InstanceNormalization*
+epsilon¬Å'7 
+×
+t/net/conv_blocks_localization.0/conv_blocks_localization.0.0/blocks/blocks.0/instnorm/InstanceNormalization_output_0e/net/conv_blocks_localization.0/conv_blocks_localization.0.0/blocks/blocks.0/lrelu/LeakyRelu_output_0\/net/conv_blocks_localization.0/conv_blocks_localization.0.0/blocks/blocks.0/lrelu/LeakyRelu"	LeakyRelu*
+alpha
+×#< 
+ú
+e/net/conv_blocks_localization.0/conv_blocks_localization.0.0/blocks/blocks.0/lrelu/LeakyRelu_output_0
+5net.conv_blocks_localization.0.1.blocks.0.conv.weight
+3net.conv_blocks_localization.0.1.blocks.0.conv.bias_/net/conv_blocks_localization.0/conv_blocks_localization.0.1/blocks/blocks.0/conv/Conv_output_0V/net/conv_blocks_localization.0/conv_blocks_localization.0.1/blocks/blocks.0/conv/Conv"Conv*
+	dilations@@@ *
+group *
+kernel_shape@@@ *
+pads@@@@@@ *
+strides@@@ 
+â
+_/net/conv_blocks_localization.0/conv_blocks_localization.0.1/blocks/blocks.0/conv/Conv_output_0
+9net.conv_blocks_localization.0.1.blocks.0.instnorm.weight
+7net.conv_blocks_localization.0.1.blocks.0.instnorm.biast/net/conv_blocks_localization.0/conv_blocks_localization.0.1/blocks/blocks.0/instnorm/InstanceNormalization_output_0k/net/conv_blocks_localization.0/conv_blocks_localization.0.1/blocks/blocks.0/instnorm/InstanceNormalization"InstanceNormalization*
+epsilon¬Å'7 
+×
+t/net/conv_blocks_localization.0/conv_blocks_localization.0.1/blocks/blocks.0/instnorm/InstanceNormalization_output_0e/net/conv_blocks_localization.0/conv_blocks_localization.0.1/blocks/blocks.0/lrelu/LeakyRelu_output_0\/net/conv_blocks_localization.0/conv_blocks_localization.0.1/blocks/blocks.0/lrelu/LeakyRelu"	LeakyRelu*
+alpha
+×#< 
+ª
+e/net/conv_blocks_localization.0/conv_blocks_localization.0.1/blocks/blocks.0/lrelu/LeakyRelu_output_0
+net.tu.1.weight /net/tu.1/ConvTranspose_output_0/net/tu.1/ConvTranspose"ConvTranspose*
+	dilations@@@ *
+group *
+kernel_shape@@@ *
+pads@ @ @ @ @ @  *
+strides@@@ 
+£
+ /net/tu.1/ConvTranspose_output_0
+C/net/conv_blocks_context.3/blocks/blocks.1/lrelu/LeakyRelu_output_0/net/Concat_1_output_0/net/Concat_1"Concat*
+axis 
+«
+/net/Concat_1_output_0
+5net.conv_blocks_localization.1.0.blocks.0.conv.weight
+3net.conv_blocks_localization.1.0.blocks.0.conv.bias_/net/conv_blocks_localization.1/conv_blocks_localization.1.0/blocks/blocks.0/conv/Conv_output_0V/net/conv_blocks_localization.1/conv_blocks_localization.1.0/blocks/blocks.0/conv/Conv"Conv*
+	dilations@@@ *
+group *
+kernel_shape@@@ *
+pads@@@@@@ *
+strides@@@ 
+â
+_/net/conv_blocks_localization.1/conv_blocks_localization.1.0/blocks/blocks.0/conv/Conv_output_0
+9net.conv_blocks_localization.1.0.blocks.0.instnorm.weight
+7net.conv_blocks_localization.1.0.blocks.0.instnorm.biast/net/conv_blocks_localization.1/conv_blocks_localization.1.0/blocks/blocks.0/instnorm/InstanceNormalization_output_0k/net/conv_blocks_localization.1/conv_blocks_localization.1.0/blocks/blocks.0/instnorm/InstanceNormalization"InstanceNormalization*
+epsilon¬Å'7 
+×
+t/net/conv_blocks_localization.1/conv_blocks_localization.1.0/blocks/blocks.0/instnorm/InstanceNormalization_output_0e/net/conv_blocks_localization.1/conv_blocks_localization.1.0/blocks/blocks.0/lrelu/LeakyRelu_output_0\/net/conv_blocks_localization.1/conv_blocks_localization.1.0/blocks/blocks.0/lrelu/LeakyRelu"	LeakyRelu*
+alpha
+×#< 
+ú
+e/net/conv_blocks_localization.1/conv_blocks_localization.1.0/blocks/blocks.0/lrelu/LeakyRelu_output_0
+5net.conv_blocks_localization.1.1.blocks.0.conv.weight
+3net.conv_blocks_localization.1.1.blocks.0.conv.bias_/net/conv_blocks_localization.1/conv_blocks_localization.1.1/blocks/blocks.0/conv/Conv_output_0V/net/conv_blocks_localization.1/conv_blocks_localization.1.1/blocks/blocks.0/conv/Conv"Conv*
+	dilations@@@ *
+group *
+kernel_shape@@@ *
+pads@@@@@@ *
+strides@@@ 
+â
+_/net/conv_blocks_localization.1/conv_blocks_localization.1.1/blocks/blocks.0/conv/Conv_output_0
+9net.conv_blocks_localization.1.1.blocks.0.instnorm.weight
+7net.conv_blocks_localization.1.1.blocks.0.instnorm.biast/net/conv_blocks_localization.1/conv_blocks_localization.1.1/blocks/blocks.0/instnorm/InstanceNormalization_output_0k/net/conv_blocks_localization.1/conv_blocks_localization.1.1/blocks/blocks.0/instnorm/InstanceNormalization"InstanceNormalization*
+epsilon¬Å'7 
+×
+t/net/conv_blocks_localization.1/conv_blocks_localization.1.1/blocks/blocks.0/instnorm/InstanceNormalization_output_0e/net/conv_blocks_localization.1/conv_blocks_localization.1.1/blocks/blocks.0/lrelu/LeakyRelu_output_0\/net/conv_blocks_localization.1/conv_blocks_localization.1.1/blocks/blocks.0/lrelu/LeakyRelu"	LeakyRelu*
+alpha
+×#< 
+ª
+e/net/conv_blocks_localization.1/conv_blocks_localization.1.1/blocks/blocks.0/lrelu/LeakyRelu_output_0
+net.tu.2.weight /net/tu.2/ConvTranspose_output_0/net/tu.2/ConvTranspose"ConvTranspose*
+	dilations@@@ *
+group *
+kernel_shape@@@ *
+pads@ @ @ @ @ @  *
+strides@@@ 
+£
+ /net/tu.2/ConvTranspose_output_0
+C/net/conv_blocks_context.2/blocks/blocks.1/lrelu/LeakyRelu_output_0/net/Concat_2_output_0/net/Concat_2"Concat*
+axis 
+«
+/net/Concat_2_output_0
+5net.conv_blocks_localization.2.0.blocks.0.conv.weight
+3net.conv_blocks_localization.2.0.blocks.0.conv.bias_/net/conv_blocks_localization.2/conv_blocks_localization.2.0/blocks/blocks.0/conv/Conv_output_0V/net/conv_blocks_localization.2/conv_blocks_localization.2.0/blocks/blocks.0/conv/Conv"Conv*
+	dilations@@@ *
+group *
+kernel_shape@@@ *
+pads@@@@@@ *
+strides@@@ 
+â
+_/net/conv_blocks_localization.2/conv_blocks_localization.2.0/blocks/blocks.0/conv/Conv_output_0
+9net.conv_blocks_localization.2.0.blocks.0.instnorm.weight
+7net.conv_blocks_localization.2.0.blocks.0.instnorm.biast/net/conv_blocks_localization.2/conv_blocks_localization.2.0/blocks/blocks.0/instnorm/InstanceNormalization_output_0k/net/conv_blocks_localization.2/conv_blocks_localization.2.0/blocks/blocks.0/instnorm/InstanceNormalization"InstanceNormalization*
+epsilon¬Å'7 
+×
+t/net/conv_blocks_localization.2/conv_blocks_localization.2.0/blocks/blocks.0/instnorm/InstanceNormalization_output_0e/net/conv_blocks_localization.2/conv_blocks_localization.2.0/blocks/blocks.0/lrelu/LeakyRelu_output_0\/net/conv_blocks_localization.2/conv_blocks_localization.2.0/blocks/blocks.0/lrelu/LeakyRelu"	LeakyRelu*
+alpha
+×#< 
+ú
+e/net/conv_blocks_localization.2/conv_blocks_localization.2.0/blocks/blocks.0/lrelu/LeakyRelu_output_0
+5net.conv_blocks_localization.2.1.blocks.0.conv.weight
+3net.conv_blocks_localization.2.1.blocks.0.conv.bias_/net/conv_blocks_localization.2/conv_blocks_localization.2.1/blocks/blocks.0/conv/Conv_output_0V/net/conv_blocks_localization.2/conv_blocks_localization.2.1/blocks/blocks.0/conv/Conv"Conv*
+	dilations@@@ *
+group *
+kernel_shape@@@ *
+pads@@@@@@ *
+strides@@@ 
+â
+_/net/conv_blocks_localization.2/conv_blocks_localization.2.1/blocks/blocks.0/conv/Conv_output_0
+9net.conv_blocks_localization.2.1.blocks.0.instnorm.weight
+7net.conv_blocks_localization.2.1.blocks.0.instnorm.biast/net/conv_blocks_localization.2/conv_blocks_localization.2.1/blocks/blocks.0/instnorm/InstanceNormalization_output_0k/net/conv_blocks_localization.2/conv_blocks_localization.2.1/blocks/blocks.0/instnorm/InstanceNormalization"InstanceNormalization*
+epsilon¬Å'7 
+×
+t/net/conv_blocks_localization.2/conv_blocks_localization.2.1/blocks/blocks.0/instnorm/InstanceNormalization_output_0e/net/conv_blocks_localization.2/conv_blocks_localization.2.1/blocks/blocks.0/lrelu/LeakyRelu_output_0\/net/conv_blocks_localization.2/conv_blocks_localization.2.1/blocks/blocks.0/lrelu/LeakyRelu"	LeakyRelu*
+alpha
+×#< 
+ª
+e/net/conv_blocks_localization.2/conv_blocks_localization.2.1/blocks/blocks.0/lrelu/LeakyRelu_output_0
+net.tu.3.weight /net/tu.3/ConvTranspose_output_0/net/tu.3/ConvTranspose"ConvTranspose*
+	dilations@@@ *
+group *
+kernel_shape@@@ *
+pads@ @ @ @ @ @  *
+strides@@@ 
+£
+ /net/tu.3/ConvTranspose_output_0
+C/net/conv_blocks_context.1/blocks/blocks.1/lrelu/LeakyRelu_output_0/net/Concat_3_output_0/net/Concat_3"Concat*
+axis 
+«
+/net/Concat_3_output_0
+5net.conv_blocks_localization.3.0.blocks.0.conv.weight
+3net.conv_blocks_localization.3.0.blocks.0.conv.bias_/net/conv_blocks_localization.3/conv_blocks_localization.3.0/blocks/blocks.0/conv/Conv_output_0V/net/conv_blocks_localization.3/conv_blocks_localization.3.0/blocks/blocks.0/conv/Conv"Conv*
+	dilations@@@ *
+group *
+kernel_shape@@@ *
+pads@@@@@@ *
+strides@@@ 
+â
+_/net/conv_blocks_localization.3/conv_blocks_localization.3.0/blocks/blocks.0/conv/Conv_output_0
+9net.conv_blocks_localization.3.0.blocks.0.instnorm.weight
+7net.conv_blocks_localization.3.0.blocks.0.instnorm.biast/net/conv_blocks_localization.3/conv_blocks_localization.3.0/blocks/blocks.0/instnorm/InstanceNormalization_output_0k/net/conv_blocks_localization.3/conv_blocks_localization.3.0/blocks/blocks.0/instnorm/InstanceNormalization"InstanceNormalization*
+epsilon¬Å'7 
+×
+t/net/conv_blocks_localization.3/conv_blocks_localization.3.0/blocks/blocks.0/instnorm/InstanceNormalization_output_0e/net/conv_blocks_localization.3/conv_blocks_localization.3.0/blocks/blocks.0/lrelu/LeakyRelu_output_0\/net/conv_blocks_localization.3/conv_blocks_localization.3.0/blocks/blocks.0/lrelu/LeakyRelu"	LeakyRelu*
+alpha
+×#< 
+ú
+e/net/conv_blocks_localization.3/conv_blocks_localization.3.0/blocks/blocks.0/lrelu/LeakyRelu_output_0
+5net.conv_blocks_localization.3.1.blocks.0.conv.weight
+3net.conv_blocks_localization.3.1.blocks.0.conv.bias_/net/conv_blocks_localization.3/conv_blocks_localization.3.1/blocks/blocks.0/conv/Conv_output_0V/net/conv_blocks_localization.3/conv_blocks_localization.3.1/blocks/blocks.0/conv/Conv"Conv*
+	dilations@@@ *
+group *
+kernel_shape@@@ *
+pads@@@@@@ *
+strides@@@ 
+â
+_/net/conv_blocks_localization.3/conv_blocks_localization.3.1/blocks/blocks.0/conv/Conv_output_0
+9net.conv_blocks_localization.3.1.blocks.0.instnorm.weight
+7net.conv_blocks_localization.3.1.blocks.0.instnorm.biast/net/conv_blocks_localization.3/conv_blocks_localization.3.1/blocks/blocks.0/instnorm/InstanceNormalization_output_0k/net/conv_blocks_localization.3/conv_blocks_localization.3.1/blocks/blocks.0/instnorm/InstanceNormalization"InstanceNormalization*
+epsilon¬Å'7 
+×
+t/net/conv_blocks_localization.3/conv_blocks_localization.3.1/blocks/blocks.0/instnorm/InstanceNormalization_output_0e/net/conv_blocks_localization.3/conv_blocks_localization.3.1/blocks/blocks.0/lrelu/LeakyRelu_output_0\/net/conv_blocks_localization.3/conv_blocks_localization.3.1/blocks/blocks.0/lrelu/LeakyRelu"	LeakyRelu*
+alpha
+×#< 
+ª
+e/net/conv_blocks_localization.3/conv_blocks_localization.3.1/blocks/blocks.0/lrelu/LeakyRelu_output_0
+net.tu.4.weight /net/tu.4/ConvTranspose_output_0/net/tu.4/ConvTranspose"ConvTranspose*
+	dilations@@@ *
+group *
+kernel_shape@@@ *
+pads@ @ @ @ @ @  *
+strides@@@ 
+£
+ /net/tu.4/ConvTranspose_output_0
+C/net/conv_blocks_context.0/blocks/blocks.1/lrelu/LeakyRelu_output_0/net/Concat_4_output_0/net/Concat_4"Concat*
+axis 
+«
+/net/Concat_4_output_0
+5net.conv_blocks_localization.4.0.blocks.0.conv.weight
+3net.conv_blocks_localization.4.0.blocks.0.conv.bias_/net/conv_blocks_localization.4/conv_blocks_localization.4.0/blocks/blocks.0/conv/Conv_output_0V/net/conv_blocks_localization.4/conv_blocks_localization.4.0/blocks/blocks.0/conv/Conv"Conv*
+	dilations@@@ *
+group *
+kernel_shape@@@ *
+pads@@@@@@ *
+strides@@@ 
+â
+_/net/conv_blocks_localization.4/conv_blocks_localization.4.0/blocks/blocks.0/conv/Conv_output_0
+9net.conv_blocks_localization.4.0.blocks.0.instnorm.weight
+7net.conv_blocks_localization.4.0.blocks.0.instnorm.biast/net/conv_blocks_localization.4/conv_blocks_localization.4.0/blocks/blocks.0/instnorm/InstanceNormalization_output_0k/net/conv_blocks_localization.4/conv_blocks_localization.4.0/blocks/blocks.0/instnorm/InstanceNormalization"InstanceNormalization*
+epsilon¬Å'7 
+×
+t/net/conv_blocks_localization.4/conv_blocks_localization.4.0/blocks/blocks.0/instnorm/InstanceNormalization_output_0e/net/conv_blocks_localization.4/conv_blocks_localization.4.0/blocks/blocks.0/lrelu/LeakyRelu_output_0\/net/conv_blocks_localization.4/conv_blocks_localization.4.0/blocks/blocks.0/lrelu/LeakyRelu"	LeakyRelu*
+alpha
+×#< 
+ú
+e/net/conv_blocks_localization.4/conv_blocks_localization.4.0/blocks/blocks.0/lrelu/LeakyRelu_output_0
+5net.conv_blocks_localization.4.1.blocks.0.conv.weight
+3net.conv_blocks_localization.4.1.blocks.0.conv.bias_/net/conv_blocks_localization.4/conv_blocks_localization.4.1/blocks/blocks.0/conv/Conv_output_0V/net/conv_blocks_localization.4/conv_blocks_localization.4.1/blocks/blocks.0/conv/Conv"Conv*
+	dilations@@@ *
+group *
+kernel_shape@@@ *
+pads@@@@@@ *
+strides@@@ 
+â
+_/net/conv_blocks_localization.4/conv_blocks_localization.4.1/blocks/blocks.0/conv/Conv_output_0
+9net.conv_blocks_localization.4.1.blocks.0.instnorm.weight
+7net.conv_blocks_localization.4.1.blocks.0.instnorm.biast/net/conv_blocks_localization.4/conv_blocks_localization.4.1/blocks/blocks.0/instnorm/InstanceNormalization_output_0k/net/conv_blocks_localization.4/conv_blocks_localization.4.1/blocks/blocks.0/instnorm/InstanceNormalization"InstanceNormalization*
+epsilon¬Å'7 
+×
+t/net/conv_blocks_localization.4/conv_blocks_localization.4.1/blocks/blocks.0/instnorm/InstanceNormalization_output_0e/net/conv_blocks_localization.4/conv_blocks_localization.4.1/blocks/blocks.0/lrelu/LeakyRelu_output_0\/net/conv_blocks_localization.4/conv_blocks_localization.4.1/blocks/blocks.0/lrelu/LeakyRelu"	LeakyRelu*
+alpha
+×#< 
+ª
+e/net/conv_blocks_localization.4/conv_blocks_localization.4.1/blocks/blocks.0/lrelu/LeakyRelu_output_0
+net.seg_outputs.4.weight /net/seg_outputs.4/Conv_output_0/net/seg_outputs.4/Conv"Conv*
+	dilations@@@ *
+group *
+kernel_shape@@@ *
+pads@ @ @ @ @ @  *
+strides@@@ 
+J
+ /net/seg_outputs.4/Conv_output_0output/Softmax"Softmax*
+axis 
+main_graph*À€B5net.conv_blocks_localization.0.0.blocks.0.conv.weightj
+locationweights.binj
+offset0j
+length22118400p*yÀB3net.conv_blocks_localization.0.0.blocks.0.conv.biasj
+locationweights.binj
+offset22118400j
+length1280p*ÀB9net.conv_blocks_localization.0.0.blocks.0.instnorm.weightj
+locationweights.binj
+offset22119680j
+length1280p*}ÀB7net.conv_blocks_localization.0.0.blocks.0.instnorm.biasj
+locationweights.binj
+offset22120960j
+length1280p*ˆÀÀB5net.conv_blocks_localization.0.1.blocks.0.conv.weightj
+locationweights.binj
+offset22122240j
+length11059200p*yÀB3net.conv_blocks_localization.0.1.blocks.0.conv.biasj
+locationweights.binj
+offset33181440j
+length1280p*ÀB9net.conv_blocks_localization.0.1.blocks.0.instnorm.weightj
+locationweights.binj
+offset33182720j
+length1280p*}ÀB7net.conv_blocks_localization.0.1.blocks.0.instnorm.biasj
+locationweights.binj
+offset33184000j
+length1280p*ˆðàB5net.conv_blocks_localization.1.0.blocks.0.conv.weightj
+locationweights.binj
+offset33185280j
+length12441600p*xðB3net.conv_blocks_localization.1.0.blocks.0.conv.biasj
+locationweights.binj
+offset45626880j
+length960p*~ðB9net.conv_blocks_localization.1.0.blocks.0.instnorm.weightj
+locationweights.binj
+offset45627840j
+length960p*|ðB7net.conv_blocks_localization.1.0.blocks.0.instnorm.biasj
+locationweights.binj
+offset45628800j
+length960p*‡ððB5net.conv_blocks_localization.1.1.blocks.0.conv.weightj
+locationweights.binj
+offset45629760j
+length6220800p*xðB3net.conv_blocks_localization.1.1.blocks.0.conv.biasj
+locationweights.binj
+offset51850560j
+length960p*~ðB9net.conv_blocks_localization.1.1.blocks.0.instnorm.weightj
+locationweights.binj
+offset51851520j
+length960p*|ðB7net.conv_blocks_localization.1.1.blocks.0.instnorm.biasj
+locationweights.binj
+offset51852480j
+length960p*†xðB5net.conv_blocks_localization.2.0.blocks.0.conv.weightj
+locationweights.binj
+offset51853440j
+length3110400p*wxB3net.conv_blocks_localization.2.0.blocks.0.conv.biasj
+locationweights.binj
+offset54963840j
+length480p*}xB9net.conv_blocks_localization.2.0.blocks.0.instnorm.weightj
+locationweights.binj
+offset54964320j
+length480p*{xB7net.conv_blocks_localization.2.0.blocks.0.instnorm.biasj
+locationweights.binj
+offset54964800j
+length480p*…xxB5net.conv_blocks_localization.2.1.blocks.0.conv.weightj
+locationweights.binj
+offset54965280j
+length1555200p*wxB3net.conv_blocks_localization.2.1.blocks.0.conv.biasj
+locationweights.binj
+offset56520480j
+length480p*}xB9net.conv_blocks_localization.2.1.blocks.0.instnorm.weightj
+locationweights.binj
+offset56520960j
+length480p*{xB7net.conv_blocks_localization.2.1.blocks.0.instnorm.biasj
+locationweights.binj
+offset56521440j
+length480p*„<xB5net.conv_blocks_localization.3.0.blocks.0.conv.weightj
+locationweights.binj
+offset56521920j
+length777600p*w<B3net.conv_blocks_localization.3.0.blocks.0.conv.biasj
+locationweights.binj
+offset57299520j
+length240p*}<B9net.conv_blocks_localization.3.0.blocks.0.instnorm.weightj
+locationweights.binj
+offset57299760j
+length240p*{<B7net.conv_blocks_localization.3.0.blocks.0.instnorm.biasj
+locationweights.binj
+offset57300000j
+length240p*„<<B5net.conv_blocks_localization.3.1.blocks.0.conv.weightj
+locationweights.binj
+offset57300240j
+length388800p*w<B3net.conv_blocks_localization.3.1.blocks.0.conv.biasj
+locationweights.binj
+offset57689040j
+length240p*}<B9net.conv_blocks_localization.3.1.blocks.0.instnorm.weightj
+locationweights.binj
+offset57689280j
+length240p*{<B7net.conv_blocks_localization.3.1.blocks.0.instnorm.biasj
+locationweights.binj
+offset57689520j
+length240p*„<B5net.conv_blocks_localization.4.0.blocks.0.conv.weightj
+locationweights.binj
+offset57689760j
+length194400p*wB3net.conv_blocks_localization.4.0.blocks.0.conv.biasj
+locationweights.binj
+offset57884160j
+length120p*}B9net.conv_blocks_localization.4.0.blocks.0.instnorm.weightj
+locationweights.binj
+offset57884280j
+length120p*{B7net.conv_blocks_localization.4.0.blocks.0.instnorm.biasj
+locationweights.binj
+offset57884400j
+length120p*ƒB5net.conv_blocks_localization.4.1.blocks.0.conv.weightj
+locationweights.binj
+offset57884520j
+length97200p*wB3net.conv_blocks_localization.4.1.blocks.0.conv.biasj
+locationweights.binj
+offset57981720j
+length120p*}B9net.conv_blocks_localization.4.1.blocks.0.instnorm.weightj
+locationweights.binj
+offset57981840j
+length120p*{B7net.conv_blocks_localization.4.1.blocks.0.instnorm.biasj
+locationweights.binj
+offset57981960j
+length120p*|B.net.conv_blocks_context.0.blocks.0.conv.weightj
+locationweights.binj
+offset57982080j
+length12960p*pB,net.conv_blocks_context.0.blocks.0.conv.biasj
+locationweights.binj
+offset57995040j
+length120p*vB2net.conv_blocks_context.0.blocks.0.instnorm.weightj
+locationweights.binj
+offset57995160j
+length120p*tB0net.conv_blocks_context.0.blocks.0.instnorm.biasj
+locationweights.binj
+offset57995280j
+length120p*|B.net.conv_blocks_context.0.blocks.1.conv.weightj
+locationweights.binj
+offset57995400j
+length97200p*pB,net.conv_blocks_context.0.blocks.1.conv.biasj
+locationweights.binj
+offset58092600j
+length120p*vB2net.conv_blocks_context.0.blocks.1.instnorm.weightj
+locationweights.binj
+offset58092720j
+length120p*tB0net.conv_blocks_context.0.blocks.1.instnorm.biasj
+locationweights.binj
+offset58092840j
+length120p*}<B.net.conv_blocks_context.1.blocks.0.conv.weightj
+locationweights.binj
+offset58092960j
+length194400p*p<B,net.conv_blocks_context.1.blocks.0.conv.biasj
+locationweights.binj
+offset58287360j
+length240p*v<B2net.conv_blocks_context.1.blocks.0.instnorm.weightj
+locationweights.binj
+offset58287600j
+length240p*t<B0net.conv_blocks_context.1.blocks.0.instnorm.biasj
+locationweights.binj
+offset58287840j
+length240p*}<<B.net.conv_blocks_context.1.blocks.1.conv.weightj
+locationweights.binj
+offset58288080j
+length388800p*p<B,net.conv_blocks_context.1.blocks.1.conv.biasj
+locationweights.binj
+offset58676880j
+length240p*v<B2net.conv_blocks_context.1.blocks.1.instnorm.weightj
+locationweights.binj
+offset58677120j
+length240p*t<B0net.conv_blocks_context.1.blocks.1.instnorm.biasj
+locationweights.binj
+offset58677360j
+length240p*}x<B.net.conv_blocks_context.2.blocks.0.conv.weightj
+locationweights.binj
+offset58677600j
+length777600p*pxB,net.conv_blocks_context.2.blocks.0.conv.biasj
+locationweights.binj
+offset59455200j
+length480p*vxB2net.conv_blocks_context.2.blocks.0.instnorm.weightj
+locationweights.binj
+offset59455680j
+length480p*txB0net.conv_blocks_context.2.blocks.0.instnorm.biasj
+locationweights.binj
+offset59456160j
+length480p*~xxB.net.conv_blocks_context.2.blocks.1.conv.weightj
+locationweights.binj
+offset59456640j
+length1555200p*pxB,net.conv_blocks_context.2.blocks.1.conv.biasj
+locationweights.binj
+offset61011840j
+length480p*vxB2net.conv_blocks_context.2.blocks.1.instnorm.weightj
+locationweights.binj
+offset61012320j
+length480p*txB0net.conv_blocks_context.2.blocks.1.instnorm.biasj
+locationweights.binj
+offset61012800j
+length480p*ðxB.net.conv_blocks_context.3.blocks.0.conv.weightj
+locationweights.binj
+offset61013280j
+length3110400p*qðB,net.conv_blocks_context.3.blocks.0.conv.biasj
+locationweights.binj
+offset64123680j
+length960p*wðB2net.conv_blocks_context.3.blocks.0.instnorm.weightj
+locationweights.binj
+offset64124640j
+length960p*uðB0net.conv_blocks_context.3.blocks.0.instnorm.biasj
+locationweights.binj
+offset64125600j
+length960p*€ððB.net.conv_blocks_context.3.blocks.1.conv.weightj
+locationweights.binj
+offset64126560j
+length6220800p*qðB,net.conv_blocks_context.3.blocks.1.conv.biasj
+locationweights.binj
+offset70347360j
+length960p*wðB2net.conv_blocks_context.3.blocks.1.instnorm.weightj
+locationweights.binj
+offset70348320j
+length960p*uðB0net.conv_blocks_context.3.blocks.1.instnorm.biasj
+locationweights.binj
+offset70349280j
+length960p*€ÀðB.net.conv_blocks_context.4.blocks.0.conv.weightj
+locationweights.binj
+offset70350240j
+length8294400p*rÀB,net.conv_blocks_context.4.blocks.0.conv.biasj
+locationweights.binj
+offset78644640j
+length1280p*xÀB2net.conv_blocks_context.4.blocks.0.instnorm.weightj
+locationweights.binj
+offset78645920j
+length1280p*vÀB0net.conv_blocks_context.4.blocks.0.instnorm.biasj
+locationweights.binj
+offset78647200j
+length1280p*ÀÀB.net.conv_blocks_context.4.blocks.1.conv.weightj
+locationweights.binj
+offset78648480j
+length11059200p*rÀB,net.conv_blocks_context.4.blocks.1.conv.biasj
+locationweights.binj
+offset89707680j
+length1280p*xÀB2net.conv_blocks_context.4.blocks.1.instnorm.weightj
+locationweights.binj
+offset89708960j
+length1280p*vÀB0net.conv_blocks_context.4.blocks.1.instnorm.biasj
+locationweights.binj
+offset89710240j
+length1280p*ƒÀÀB0net.conv_blocks_context.5.0.blocks.0.conv.weightj
+locationweights.binj
+offset89711520j
+length11059200p*uÀB.net.conv_blocks_context.5.0.blocks.0.conv.biasj
+locationweights.binj
+offset	100770720j
+length1280p*{ÀB4net.conv_blocks_context.5.0.blocks.0.instnorm.weightj
+locationweights.binj
+offset	100772000j
+length1280p*yÀB2net.conv_blocks_context.5.0.blocks.0.instnorm.biasj
+locationweights.binj
+offset	100773280j
+length1280p*„ÀÀB0net.conv_blocks_context.5.1.blocks.0.conv.weightj
+locationweights.binj
+offset	100774560j
+length11059200p*uÀB.net.conv_blocks_context.5.1.blocks.0.conv.biasj
+locationweights.binj
+offset	111833760j
+length1280p*{ÀB4net.conv_blocks_context.5.1.blocks.0.instnorm.weightj
+locationweights.binj
+offset	111835040j
+length1280p*yÀB2net.conv_blocks_context.5.1.blocks.0.instnorm.biasj
+locationweights.binj
+offset	111836320j
+length1280p*bÀÀBnet.tu.0.weightj
+locationweights.binj
+offset	111837600j
+length3276800p*bÀðBnet.tu.1.weightj
+locationweights.binj
+offset	115114400j
+length2457600p*`ðxBnet.tu.2.weightj
+locationweights.binj
+offset	117572000j
+length921600p*_x<Bnet.tu.3.weightj
+locationweights.binj
+offset	118493600j
+length230400p*^<Bnet.tu.4.weightj
+locationweights.binj
+offset	118724000j
+length57600p*eBnet.seg_outputs.4.weightj
+locationweights.binj
+offset	118781600j
+length360pZ&
+input
+
+
+
+€
+€
+€b'
+output
+
+
+
+€
+€
+€B
