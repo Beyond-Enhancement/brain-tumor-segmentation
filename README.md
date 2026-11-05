@@ -9,7 +9,7 @@ masking), runs the chosen model and shows the result on a 3-plane viewer with th
 volumes in cm3. The segmentation and the prepared inputs are saved as NIfTI. All processing
 happens on the computer it runs on.
 
-![Workbench running the TCGA-FG-6692 demo](docs/workbench.png)
+![Workbench (v1.1.1) running the TCGA-FG-6692 demo with HD-GLIO](docs/workbench.png)
 
 ## What it measures
 

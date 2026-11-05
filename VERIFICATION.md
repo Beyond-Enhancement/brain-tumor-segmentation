@@ -1,6 +1,9 @@
 # Verification
 
-Tested build: v1.0.0, 2026-11-04; section 5 covers what v1.1.0 adds (also 2026-11-04). Test machine: Linux container, 2 CPU cores, 7 GB RAM, no GPU,
+Tested build: v1.0.0, 2026-11-04; section 5 covers what v1.1.0 adds (also 2026-11-04). v1.1.1
+changes only the page markup (the wrapping of two option labels); the processing code, networks
+and add-on file are unchanged, and the demo case gives the same result (checked when taking the
+README screenshot). Test machine: Linux container, 2 CPU cores, 7 GB RAM, no GPU,
 headless Chrome. Unless stated otherwise the case is TCGA-FG-6692 (the built-in demo: 2D axial
 T1, T1c, T2, FLAIR, 0.9 x 0.9 x 5.5 mm).
 
