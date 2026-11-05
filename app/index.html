@@ -43,14 +43,22 @@
 
     <section>
       <h2>Processing options</h2>
-      <label class="field">Reference grid
-        <select id="optRef">
-          <option value="native" selected>T1 native grid (as published)</option>
-          <option value="iso">T1, resampled to 1 mm isotropic</option>
+      <label class="field">Register to
+        <select id="optRefSeq">
+          <option value="T1" selected>T1 (as published)</option>
+          <option value="T1c">T1c</option>
+          <option value="FLAIR">FLAIR</option>
         </select>
       </label>
-      <label class="check"><input type="checkbox" id="optBet" checked> Brain extraction with HD-BET. Uncheck if the inputs are already skull-stripped.</label>
-      <label class="check"><input type="checkbox" id="optReg" checked> Rigid registration of T1c, T2 and FLAIR to T1. Uncheck if they are already co-registered on one grid.</label>
+      <label class="field">Grid
+        <select id="optGrid">
+          <option value="native" selected>Reference as acquired</option>
+          <option value="iso">Reference resampled to 1 mm isotropic</option>
+        </select>
+      </label>
+      <p class="muted small" id="refNote"></p>
+      <label class="check"><input type="checkbox" id="optBet" checked> <span id="betLabel">Brain extraction with HD-BET on T1.</span> Uncheck if the inputs are already skull-stripped.</label>
+      <label class="check"><input type="checkbox" id="optReg" checked> <span id="regLabel">Rigid registration of T1c, T2 and FLAIR to T1.</span> Uncheck if they are already co-registered on one grid.</label>
       <label class="check"><input type="checkbox" id="optTta"> Test-time augmentation: 8 mirrored passes, as in the published HD-GLIO. About 8 times slower.</label>
       <label class="field">Compute
         <select id="optDevice">
@@ -70,6 +78,7 @@
       <label>Background <select id="bgSel" disabled></select></label>
       <label>Overlay <input type="range" id="opacity" min="0" max="1" step="0.05" value="0.55"></label>
       <label class="check inline"><input type="checkbox" id="optRadio" checked> Radiological L/R</label>
+      <label class="check inline"><input type="checkbox" id="optCross" checked> Crosshairs</label>
       <label class="check inline"><input type="checkbox" id="optBrain"> Brain mask outline</label>
       <span class="spacer"></span>
       <span id="cursor" class="mono small"></span>

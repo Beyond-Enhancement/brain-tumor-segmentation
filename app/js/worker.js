@@ -80,7 +80,8 @@ async function loadFiles(files) {
 function sendSeries(stats) {
   const list = [...state.series.values()].map(s => ({ ...s.desc, kind: s.kind, scores: s.scores }));
   const guess = DCM.assignRoles([...state.series.values()].map(s => ({ id: s.id, scores: s.scores, bonus: s.kind === 'dicom' && s.desc.acqType === '3D' ? 0.5 : 0 })));
-  post('series', { list, guess, stats });
+  const inferred = DCM.fillByElimination(guess, [...state.series.keys()]);
+  post('series', { list, guess, inferred, stats });
 }
 
 async function getVolume(id) {
@@ -195,18 +196,17 @@ async function run(assignment, opt) {
   const gpu = await gpuInfo();
   let backend = opt.device === 'cpu' ? 'wasm' : opt.device === 'gpu' ? 'webgpu' : (gpu && !gpu.software ? 'webgpu' : 'wasm');
   if (backend === 'webgpu' && !gpu) { backend = 'wasm'; note('No WebGPU adapter: using the CPU'); }
+  if (backend === 'webgpu' && state.gpuBroken) { backend = 'wasm'; note('The GPU failed earlier in this session: using the CPU'); }
+  else if (backend === 'webgpu' && opt.device === 'auto' && opt.avoidGpu) { backend = 'wasm'; note('The GPU failed on this computer before: Automatic uses the CPU (choose GPU to try it again)'); }
+  const ctx = { backend, note, gpuFailed: false, usedGpu: false };
+  const netProgress = (stage, name) => (st, f, e) => progress(stage, st === 'network' ? 0.1 + 0.85 * f : st === 'preprocess' ? 0.1 * f : 0.95,
+    st === 'network' && e ? name + ': patch ' + e.tile + '/' + e.tiles + (e.mirrors > 1 ? ', mirror ' + e.mirror + '/' + e.mirrors : '') + (ctx.backend === 'webgpu' ? ' (GPU)' : '') : name + ' preprocessing');
 
   // 2) brain extraction (HD-BET) on the reference
   let brain;
   if (opt.skullStrip) {
     progress('hdbet', 0, 'HD-BET brain extraction on ' + refRole);
-    const net = await getNetworkSafe('hdbet', backend, note);
-    backend = net.backend;
-    const cfg = net.cfg;
-    const r = await predictCase([refOnGrid.data], npShape(grid.dims), npSpacing(grid.affine), cfg, (p, d) => net.run(p, d), {
-      tta: !!opt.ttaBet, shouldStop: cancelled,
-      onProgress: (stage, f, e) => progress('hdbet', stage === 'network' ? 0.1 + 0.85 * f : stage === 'preprocess' ? 0.1 * f : 0.95, stage === 'network' && e ? 'HD-BET: patch ' + e.tile + '/' + e.tiles + (e.mirrors > 1 ? ', mirror ' + e.mirror + '/' + e.mirrors : '') : 'HD-BET preprocessing'),
-    });
+    const { res: r } = await runNetwork('hdbet', 'HD-BET', 'hdbet', [refOnGrid.data], npShape(grid.dims), npSpacing(grid.affine), !!opt.ttaBet, ctx, netProgress('hdbet', 'HD-BET'));
     brain = new Uint8Array(r.seg.length);
     for (let i = 0; i < brain.length; i++) brain[i] = r.seg[i] === 1 ? 1 : 0;
     if (opt.lcc !== false) brain = largestComponent(brain, grid.dims);
@@ -246,15 +246,11 @@ async function run(assignment, opt) {
 
   // 5) HD-GLIO
   progress('hdglio', 0, 'Loading HD-GLIO');
-  const net = await getNetworkSafe('hdglio', backend, note);
-  backend = net.backend;
-  const gcfg = net.cfg;
+  const gcfg = await loadModelConfig('hdglio');
   const chans = gcfg.inputChannels.map(r => masked[r]);
-  const res = await predictCase(chans, npShape(grid.dims), npSpacing(grid.affine), gcfg, (p, d) => net.run(p, d), {
-    tta: !!opt.tta, shouldStop: cancelled,
-    onProgress: (stage, f, e) => progress('hdglio', stage === 'network' ? 0.1 + 0.85 * f : stage === 'preprocess' ? 0.1 * f : 0.95, stage === 'network' && e ? 'HD-GLIO: patch ' + e.tile + '/' + e.tiles + (e.mirrors > 1 ? ', mirror ' + e.mirror + '/' + e.mirrors : '') : 'HD-GLIO preprocessing'),
-  });
+  const { res } = await runNetwork('hdglio', 'HD-GLIO', 'hdglio', chans, npShape(grid.dims), npSpacing(grid.affine), !!opt.tta, ctx, netProgress('hdglio', 'HD-GLIO'));
   const seg = res.seg;
+  backend = ctx.backend;
   T.hdglio = now();
 
   // 6) volumes
@@ -285,9 +281,36 @@ async function run(assignment, opt) {
   vols.brain = bm.buffer; vols.seg = sg.buffer; transfer.push(bm.buffer, sg.buffer);
   post('result', {
     vols, comps, brainCm3, tumorCenterMM, voxelVolume: vv, voxelSize: G.spacing(grid.affine), dims: grid.dims, reg, refRole,
-    backend, gpu, timing, notes: log, tta: !!opt.tta, labels: gcfg.labels, compartments: gcfg.compartments,
+    backend, gpu, gpuFailed: ctx.gpuFailed, usedGpu: ctx.usedGpu && !ctx.gpuFailed, timing, notes: log, tta: !!opt.tta, labels: gcfg.labels, compartments: gcfg.compartments,
     model: { name: gcfg.name, version: gcfg.version, weights: gcfg.weights.format }, bet: opt.skullStrip ? (await loadModelConfig('hdbet')).version : null,
   }, transfer);
+}
+
+// A GPU failure while a network runs (device lost: on Windows usually the driver's 2-second
+// timeout (TDR) on a slow or integrated GPU, or GPU memory exhausted) restarts that network on
+// the CPU; the rest of the session stays on the CPU.
+const isGpuFailure = e => /device.*lost|is lost|mapAsync|GPUBuffer|GPUDevice|webgpu|WGPU|out of memory|OrtRun/i.test(String((e && e.message) || e));
+
+async function runNetwork(name, label, stage, channels, shape, spacing, tta, ctx, onProgress) {
+  for (;;) {
+    const net = await getNetworkSafe(name, ctx.backend, ctx.note);
+    ctx.backend = net.backend;
+    try {
+      const res = await predictCase(channels, shape, spacing, net.cfg, (p, d) => net.run(p, d), { tta, shouldStop: cancelled, onProgress });
+      if (net.backend === 'webgpu') ctx.usedGpu = true;
+      return { cfg: net.cfg, res };
+    } catch (e) {
+      if (net.backend !== 'webgpu' || cancelled() || !isGpuFailure(e)) throw e;
+      const msg = String((e && e.message) || e);
+      const why = /lost/i.test(msg) ? 'the browser lost the GPU device' : msg.slice(0, 160);
+      ctx.note('The GPU stopped responding during ' + label + ' (' + why + '). ' + label + ' was restarted and finished on the CPU.');
+      ctx.gpuFailed = true;
+      state.gpuBroken = true;
+      for (const k of Object.keys(state.nets)) { if (k.endsWith(':webgpu')) { await state.nets[k].release(); delete state.nets[k]; } }
+      ctx.backend = 'wasm';
+      progress(stage, 0, label + ': GPU stopped responding, restarting on the CPU');
+    }
+  }
 }
 
 async function getNetworkSafe(name, backend, note) {

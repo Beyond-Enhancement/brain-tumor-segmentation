@@ -220,6 +220,19 @@ export function assignRoles(items, scoreFn) {
   return out;
 }
 
+// By elimination: if three sequences are recognised and exactly one loaded series is left over
+// (for example four NIfTI files, one with an uninformative name), it takes the remaining role.
+// Returns that role, or null.
+export function fillByElimination(guess, ids) {
+  const roles = ['T1', 'T1c', 'T2', 'FLAIR'];
+  const open = roles.filter(r => !guess[r]);
+  const used = new Set(roles.map(r => guess[r]).filter(Boolean));
+  const left = ids.filter(id => !used.has(id));
+  if (open.length !== 1 || left.length !== 1) return null;
+  guess[open[0]] = left[0];
+  return open[0];
+}
+
 // ---------------------------------------------------------------------------------------
 // Volume assembly
 

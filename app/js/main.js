@@ -6,7 +6,7 @@ const ROLE_NAMES = { T1: 'T1 pre-contrast', T1c: 'T1 post-contrast', T2: 'T2', F
 const STEPS = [
   { key: 'prepare', name: 'Prepare and reorient' },
   { key: 'hdbet', name: 'Brain extraction (HD-BET)' },
-  { key: 'register', name: 'Registration to T1' },
+  { key: 'register', name: 'Registration', dynamic: () => 'Registration to ' + (ui.runRef || refSeq()) },
   { key: 'hdglio', name: 'Tumor segmentation (HD-GLIO)' },
 ];
 const COLORS = { 1: [255, 210, 63], 2: [255, 77, 77], 3: [80, 160, 255], 4: [120, 230, 140] };
@@ -104,6 +104,7 @@ function onSeries(m) {
   $('#loadStatus').textContent = (parts.join(', ') || 'No images found') + '. ' + ui.series.length + ' series available.';
   ui.assignment = {};
   for (const r of ROLES) if (m.guess[r]) ui.assignment[r] = m.guess[r];
+  ui.inferred = m.inferred ? { role: m.inferred, id: m.guess[m.inferred] } : null;
   renderRoles();
   if (ui.caseLabel) $('#caseLabel').textContent = ui.caseLabel;
 }
@@ -136,8 +137,10 @@ function renderRoles() {
     const meta = document.createElement('div');
     meta.className = 'meta';
     const s = ui.series.find(x => x.id === ui.assignment[r]);
-    meta.textContent = seriesMeta(s);
-    meta.title = meta.textContent;
+    const byElim = ui.inferred && ui.inferred.role === r && ui.inferred.id === ui.assignment[r];
+    meta.textContent = (byElim ? 'by elimination - check it.  ' : '') + seriesMeta(s);
+    if (byElim) meta.classList.add('elim');
+    meta.title = byElim ? 'The other three sequences were recognised and this was the only series left, so it was assigned here.' : meta.textContent;
     row.innerHTML = `<span class="tag" title="${ROLE_NAMES[r]}">${r}</span>`;
     row.appendChild(sel); row.appendChild(meta);
     box.appendChild(row);
@@ -152,6 +155,24 @@ function renderRoles() {
   }
 }
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// reference sequence and grid: remembered in this browser
+const refSeq = () => $('#optRefSeq').value;
+function updateRefLabels() {
+  const ref = refSeq();
+  const others = ROLES.filter(r => r !== ref);
+  $('#betLabel').textContent = 'Brain extraction with HD-BET on ' + ref + '.';
+  $('#regLabel').textContent = 'Rigid registration of ' + others.slice(0, 2).join(', ') + ' and ' + others[2] + ' to ' + ref + '.';
+  $('#refNote').textContent = ref === 'T1'
+    ? 'HD-GLIO was published with everything registered to T1.'
+    : 'Brain mask, registration and outputs on the ' + ref + ' grid. HD-GLIO was published with T1 as the reference; registering to a thinner-slice ' + ref + ' keeps more detail.';
+  if (!ui.running && document.querySelector('#steps li')) renderSteps(null);
+}
+for (const [id, key] of [['#optRefSeq', 'btsw.refSeq'], ['#optGrid', 'btsw.grid']]) {
+  try { const v = localStorage.getItem(key); if (v && [...$(id).options].some(o => o.value === v)) $(id).value = v; } catch (e) { /* storage unavailable */ }
+  $(id).addEventListener('change', () => { try { localStorage.setItem(key, $(id).value); } catch (e) { /* ignore */ } updateRefLabels(); });
+}
+updateRefLabels();
 
 // demo cases
 fetch('demo/manifest.json').then(r => (r.ok ? r.json() : [])).then(list => {
@@ -188,7 +209,7 @@ function renderSteps(active) {
     if (st.skip) continue;
     const li = document.createElement('li');
     li.className = st.err ? 'err' : st.done ? 'done' : s.key === active ? 'active' : '';
-    li.innerHTML = `<span>${s.name}</span><span class="t">${st.ms != null ? fmtMs(st.ms) : ''}</span>`;
+    li.innerHTML = `<span>${s.dynamic ? s.dynamic() : s.name}</span><span class="t">${st.ms != null ? fmtMs(st.ms) : ''}</span>`;
     if (s.key === active && !st.done) {
       li.innerHTML += `<div class="bar"><i style="width:${Math.round(100 * (st.frac || 0))}%"></i></div><div class="sub">${esc(st.text || '')}</div>`;
     }
@@ -208,8 +229,8 @@ $('#runBtn').onclick = () => {
   renderSteps('prepare');
   $('#runBtn').disabled = true; $('#cancelBtn').hidden = !cancelFlag;
   const options = {
-    reference: 'T1', isotropic: $('#optRef').value === 'iso', skullStrip: $('#optBet').checked, register: $('#optReg').checked,
-    tta: $('#optTta').checked, device: $('#optDevice').value,
+    reference: (ui.runRef = refSeq()), isotropic: $('#optGrid').value === 'iso', skullStrip: $('#optBet').checked, register: $('#optReg').checked,
+    tta: $('#optTta').checked, device: $('#optDevice').value, avoidGpu: gpuFailedBefore(),
   };
   worker.postMessage({ type: 'run', assignment: { ...ui.assignment }, options });
 };
@@ -241,16 +262,43 @@ function onError(m) {
 
 // ---------------------------------------------------------------------------------------
 // viewer
-const nv = new niivue.Niivue({
+const NV_OPTS = {
   backColor: [0, 0, 0, 1], crosshairColor: [0.88, 0.63, 0.19, 0.9], crosshairWidth: 1, show3Dcrosshair: false,
   isRadiologicalConvention: true, multiplanarForceRender: false, dragAndDropEnabled: false, loadingText: '',
   textHeight: 0.035, isColorbar: false, isOrientCube: false, multiplanarShowRender: 0, logLevel: 'error',
-});
-let nvReady = nv.attachToCanvas($('#gl')).then(() => { nv.setSliceType(nv.sliceTypeMultiplanar); nv.setRadiologicalConvention(true); });
+  sagittalNoseLeft: true, // sagittal: anterior to the left of the screen
+};
+let nv = null, nvReady = null, viewerLost = false, view = 3;
 const images = {};
 
-$$('#views button').forEach(b => b.onclick = () => { $$('#views button').forEach(x => x.classList.remove('on')); b.classList.add('on'); nv.setSliceType(+b.dataset.view); });
+// The viewer draws with WebGL. A GPU reset (for example the Windows driver timeout that also
+// stops WebGPU) destroys that context, so the viewer is rebuilt on a fresh canvas when it is lost.
+function makeViewer() {
+  const canvas = document.createElement('canvas');
+  canvas.id = 'gl';
+  $('#gl').replaceWith(canvas);
+  nv = new niivue.Niivue(NV_OPTS);
+  nv.onLocationChange = onLocation;
+  canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); viewerLost = true; }, false);
+  canvas.addEventListener('webglcontextrestored', () => { rebuildViewer(); }, false);
+  nvReady = nv.attachToCanvas(canvas).then(() => { nv.setSliceType(view); nv.setRadiologicalConvention($('#optRadio').checked); nv.setCrosshairWidth($('#optCross').checked ? 1 : 0); });
+  if (window.__hdglio) window.__hdglio.nv = nv;
+}
+async function rebuildViewer() {
+  viewerLost = false;
+  makeViewer();
+  if (ui.result) { await showVolumes(); try { centreOnTumor(ui.result); } catch (e) { /* ignore */ } }
+}
+makeViewer();
+
+$$('#views button').forEach(b => b.onclick = () => { $$('#views button').forEach(x => x.classList.remove('on')); b.classList.add('on'); view = +b.dataset.view; nv.setSliceType(view); });
 $('#optRadio').onchange = e => nv.setRadiologicalConvention(e.target.checked);
+// crosshairs on/off, remembered in this browser
+try { if (localStorage.getItem('btsw.crosshairs') === '0') $('#optCross').checked = false; } catch (e) { /* storage unavailable */ }
+$('#optCross').onchange = e => {
+  nv.setCrosshairWidth(e.target.checked ? 1 : 0);
+  try { localStorage.setItem('btsw.crosshairs', e.target.checked ? '1' : '0'); } catch (err) { /* ignore */ }
+};
 $('#opacity').oninput = e => { if (images.seg) { images.seg.opacity = +e.target.value; nv.updateGLVolume(); } };
 $('#optBrain').onchange = () => showVolumes();
 $('#bgSel').onchange = () => showVolumes();
@@ -273,6 +321,7 @@ async function makeImage(buf, name, opts) {
 
 async function showVolumes() {
   if (!ui.result) return;
+  if (viewerLost) { await rebuildViewer(); return; }
   await nvReady;
   const bg = images[$('#bgSel').value] || images.T1c;
   while (nv.volumes.length) nv.removeVolume(nv.volumes[0]);
@@ -284,14 +333,14 @@ async function showVolumes() {
   nv.updateGLVolume();
 }
 
-nv.onLocationChange = d => {
+function onLocation(d) {
   if (!d || !d.mm) return;
   const segv = (d.values || []).find(v => v.name === 'seg.nii');
   const lab = segv && ui.result ? ui.result.labels.find(l => l.value === Math.round(segv.value)) : null;
   const bgv = (d.values || [])[0];
   const ax = (v, p, n) => (v >= 0 ? p : n) + ' ' + Math.abs(v).toFixed(1);
   $('#cursor').textContent = `${ax(d.mm[0], 'R', 'L')}  ${ax(d.mm[1], 'A', 'P')}  ${ax(d.mm[2], 'S', 'I')} mm` + (bgv ? `   ${Math.round(bgv.value)}` : '') + (lab ? `   ${lab.short || lab.name}` : '');
-};
+}
 
 async function onResult(m) {
   ui.running = false;
@@ -319,7 +368,10 @@ async function onResult(m) {
   renderQC();
   $$('[data-exp]').forEach(b => (b.disabled = false));
   $('#copyBtn').disabled = false; $('#csvBtn').disabled = false;
-  toast('Segmentation finished in ' + fmtMs(m.timing.total) + '.');
+  if (m.gpuFailed) { setGpuFailed(true); showDevice(); }
+  else if (m.usedGpu) { setGpuFailed(false); showDevice(); }
+  toast(m.gpuFailed ? 'The GPU stopped responding, so the run finished on the CPU (' + fmtMs(m.timing.total) + '). Automatic will use the CPU on this computer from now on.'
+    : 'Segmentation finished in ' + fmtMs(m.timing.total) + '.', m.gpuFailed);
 }
 
 function centreOnTumor(m) {
@@ -411,12 +463,19 @@ function download(name, blob) {
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
 
+// Remember (in this browser only) that the GPU failed on this computer, so Automatic uses the CPU.
+const GPU_KEY = 'btsw.gpuFailed';
+function gpuFailedBefore() { try { return localStorage.getItem(GPU_KEY) === '1'; } catch (e) { return false; } }
+function setGpuFailed(v) { try { v ? localStorage.setItem(GPU_KEY, '1') : localStorage.removeItem(GPU_KEY); } catch (e) { /* storage unavailable */ } }
+
 function showDevice() {
+  if (!ui.env) return;
   const g = ui.env.gpu;
-  $('#device').textContent = g && !g.software ? 'GPU available (' + (g.vendor || 'WebGPU') + '). ' + ui.env.threads + ' CPU threads.'
-    : 'No usable GPU in this browser: runs on the CPU (' + ui.env.threads + ' threads).';
+  $('#device').textContent = !(g && !g.software) ? 'No usable GPU in this browser: runs on the CPU (' + ui.env.threads + ' threads).'
+    : gpuFailedBefore() ? 'The GPU (' + (g.vendor || 'WebGPU') + ') stopped responding in an earlier run, so Automatic uses the CPU (' + ui.env.threads + ' threads). Choose GPU to try it again.'
+    : 'GPU available (' + (g.vendor || 'WebGPU') + '). ' + ui.env.threads + ' CPU threads.';
 }
-window.__hdglio = { ui, nv, worker };
+window.__hdglio = { ui, nv, worker, rebuildViewer };
 
 // When served by the standalone launcher, hold a keep-alive stream open so the program exits
 // shortly after the last workbench window closes.

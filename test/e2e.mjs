@@ -35,6 +35,9 @@ if (dicom) {
 await page.waitForFunction(() => [...document.querySelectorAll('#roles select')].filter(s => s.value).length === 4, null, { timeout: 120000 });
 const roles = await page.$$eval('#roles .role', rows => rows.map(r => r.querySelector('.tag').textContent + ' = ' + r.querySelector('select').selectedOptions[0].textContent));
 if (tta) await page.check('#optTta');
+const refArg = arg('--ref');
+if (refArg) await page.selectOption('#optRefSeq', refArg);
+const roleMeta = await page.$$eval('#roles .role .meta', m => m.map(x => x.textContent));
 await page.selectOption('#optDevice', webgpu ? 'gpu' : 'cpu');
 await page.screenshot({ path: path.join(out, '1-loaded.png') });
 const tRun = Date.now();
@@ -65,7 +68,7 @@ if (csv) await csv.saveAs(path.join(out, csv.suggestedFilename()));
 for (const v of [0, 1, 2]) { await page.click(`#views button[data-view="${v}"]`); await page.waitForTimeout(400); await page.screenshot({ path: path.join(out, `3-view${v}.png`) }); }
 await page.click('#views button[data-view="3"]');
 const outside = [...new Set(requests.filter(u => !u.startsWith(base) && !u.startsWith('blob:') && !u.startsWith('data:')))];
-const summary = { roles, runMs, table, qc, info, exported, errors: errors.filter(e => !/favicon|404 \(File not found\)/.test(e)), errToast, outsideRequests: outside, totalMs: Date.now() - t0, nRequests: requests.length };
+const summary = { roles, roleMeta, runMs, table, qc, info, exported, errors: errors.filter(e => !/favicon|404 \(File not found\)/.test(e)), errToast, outsideRequests: outside, totalMs: Date.now() - t0, nRequests: requests.length };
 fs.writeFileSync(path.join(out, 'summary.json'), JSON.stringify(summary, null, 1));
 fs.writeFileSync(path.join(out, 'console.log'), logs.join('\n'));
 console.log(JSON.stringify(summary, null, 1));

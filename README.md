@@ -67,7 +67,9 @@ until IT approves them.
    - *Test-time augmentation*: the published HD-GLIO averages 8 mirrored predictions. It is off by
      default because it takes about 8 times longer; switch it on to reproduce the published
      setting exactly.
-   - *Compute*: automatic uses the GPU through WebGPU when there is one, otherwise the CPU.
+   - *Compute*: automatic uses the GPU through WebGPU when there is one, otherwise the CPU. If
+     the GPU stops responding during a run, that step restarts on the CPU and the run finishes
+     there (see Troubleshooting).
 4. **Run segmentation.** Progress is shown per step. On the CPU of a 2-core test machine the
    demo case took 9 minutes (HD-BET 5.4 min, registration 0.7 min, HD-GLIO 2.9 min), or 32
    minutes with test-time augmentation. More CPU cores, or a GPU through WebGPU, make it
@@ -79,6 +81,17 @@ until IT approves them.
 6. **Export.** Segmentation, brain mask and the four prepared inputs as `.nii.gz`. Files are on
    the reference T1 grid with the same voxel order and orientation as the T1 that was loaded, so
    they overlay it in any viewer.
+
+## Troubleshooting
+
+**"The GPU stopped responding" / "[Device] is lost".** The browser lost its GPU while a network
+was running. On Windows this is usually the graphics driver's 2-second timeout (TDR): one
+network layer on a 3D patch can take longer than that on integrated or modest GPUs, and Windows
+then resets the GPU. Running out of GPU memory has the same effect. Since version 1.0.1 the
+workbench restarts that step on the CPU and finishes the run there (same result, slower), keeps
+using the CPU for the rest of the session, and remembers it on that computer: *Automatic* then
+uses the CPU. Choose *GPU* under *Compute* to try the GPU again. With version 1.0.0 the run
+stopped with this error; choose *CPU* under *Compute* to avoid it.
 
 ## Pipeline
 

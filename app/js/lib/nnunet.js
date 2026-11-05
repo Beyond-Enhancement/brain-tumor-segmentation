@@ -177,20 +177,24 @@ async function slidingWindow(data, C, shape, cfg, runPatch, { tta, onProgress, s
   for (const s0 of steps[0]) for (const s1 of steps[1]) for (const s2 of steps[2]) tiles.push([s0, s1, s2]);
   const total = tiles.length * combos.length;
   let done = 0;
-  for (const [s0, s1, s2] of tiles) {
+  for (let ti = 0; ti < tiles.length; ti++) {
+    const [s0, s1, s2] = tiles[ti];
     for (let ch = 0; ch < C; ch++) for (let a = 0; a < ps[0]; a++) for (let b = 0; b < ps[1]; b++) {
       const src = ch * nP + ((s0 + a) * padShape[1] + (s1 + b)) * padShape[2] + s2;
       patch.set(x.subarray(src, src + ps[2]), ch * pn + (a * ps[1] + b) * ps[2]);
     }
     outAcc.fill(0);
-    for (const axes of combos) {
+    for (let mi = 0; mi < combos.length; mi++) {
+      const axes = combos[mi];
+      // report the pass about to run, so slow machines show which patch is in progress
+      if (onProgress) onProgress(done / total, { tile: ti + 1, tiles: tiles.length, mirror: mi + 1, mirrors: combos.length });
       if (shouldStop && shouldStop()) throw new Error('Cancelled');
       const inp = axes.length ? flipPatch(patch, C, ps, axes, flipped) : patch;
       const y = await runPatch(inp, [1, C, ...ps]);
       const yy = axes.length ? flipPatch(y, K, ps, axes, outFlip) : y;
       for (let i = 0; i < outAcc.length; i++) outAcc[i] += yy[i];
       done++;
-      if (onProgress) onProgress(done / total, { tile: tiles.indexOf(tiles.find(t => t[0] === s0 && t[1] === s1 && t[2] === s2)) + 1, tiles: tiles.length, mirror: combos.indexOf(axes) + 1, mirrors: combos.length });
+      if (onProgress) onProgress(done / total, { tile: ti + 1, tiles: tiles.length, mirror: mi + 1, mirrors: combos.length });
     }
     const inv = 1 / combos.length;
     for (let k = 0; k < K; k++) for (let a = 0; a < ps[0]; a++) for (let b = 0; b < ps[1]; b++) {

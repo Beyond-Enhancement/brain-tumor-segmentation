@@ -31,7 +31,7 @@ var siteFS embed.FS
 
 const (
 	appName   = "Brain Tumor Segmentation Workbench"
-	appVer    = "1.0.0"
+	appVer    = "1.0.1"
 	pingPath  = "/__bts/ping"
 	eventPath = "/__bts/events"
 	pingReply = "brain-tumor-segmentation-workbench"
