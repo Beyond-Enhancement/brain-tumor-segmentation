@@ -1,6 +1,6 @@
 # Verification
 
-Tested build: v1.0.0, 2026-11-04. Test machine: Linux container, 2 CPU cores, 7 GB RAM, no GPU,
+Tested build: v1.0.0, 2026-11-04; section 5 covers what v1.1.0 adds (also 2026-11-04). Test machine: Linux container, 2 CPU cores, 7 GB RAM, no GPU,
 headless Chrome. Unless stated otherwise the case is TCGA-FG-6692 (the built-in demo: 2D axial
 T1, T1c, T2, FLAIR, 0.9 x 0.9 x 5.5 mm).
 
@@ -166,6 +166,59 @@ written from, after bringing both to the same voxel order:
 | Launcher | Listens on 127.0.0.1 only; requests with any other Host header get 403 (DNS-rebinding guard); GET/HEAD only |
 | Offline (`unshare -rn test/offline_run.sh`: no network interface except loopback, DNS and TCP to the internet fail) | Demo case and DICOM study run end to end with identical results (CE 7.73, NE 13.92, total 21.65, brain 1656 cm3); launcher exits 30 s after the window closes |
 | Output files | Fixed names, no DICOM tags; NIfTI description names only the content |
+
+## 5. Version 1.1.0 additions
+
+**nnU-Net BraTS 2020 add-on.** One network (fold 0) of `nnUNetTrainerV2BraTSRegions_DA4_BN_BD`
+from Isensee et al.'s BraTS 2020 entry (Zenodo 4635763, CC BY 4.0), exported with 16-bit weights.
+It runs through the same JavaScript nnU-Net as HD-GLIO, plus nnU-Net's region-based output
+handling (sigmoid regions WT, TC, ET written in `regions_class_order`) and the conversion to BraTS
+labels (`convert_labels_back_to_BraTS`). Compared with the PyTorch network run by nnU-Net v1
+`predict_cases` (fold 0, fp32, CPU) on the inputs the workbench gave it, demo case, no
+augmentation (`test/validate/compare_brats.py`):
+
+| Compartment | Workbench cm3 | PyTorch cm3 | Dice |
+|---|---|---|---|
+| ET (4) | 6.997 | 6.997 | 1.00000 |
+| NCR (1) | 1.709 | 1.709 | 1.00000 |
+| ED (2) | 24.671 | 24.666 | 0.99991 |
+| TC (1 + 4) | 8.706 | 8.706 | 1.00000 |
+| WT (1 + 2 + 4) | 33.376 | 33.372 | 0.99993 |
+
+One voxel of 1,490,944 differs. The augmentation (mirroring) code is shared with HD-GLIO and was
+compared there (section 1b); it was not run separately for this model.
+
+**Add-on files.** The launcher lists `*.btsmodel` files in its own folder and serves only those,
+by exact name (a path-traversal request and an unlisted file name both return 404). The page
+checks the format and the SHA-256 of the weights before offering a model; a copy with one byte
+changed was rejected ("the file is damaged (checksum does not match)").
+
+**Reference sequence.** TCGA-DU-7294, files named as at the requesting institution
+(`17_AX_T1_PRE`, `20_SAG_MPR`, `15_AX_T2`, `8_SAG_3D_FLAIR`), T1 and T2 with 5 mm slices, T1c and
+FLAIR with 2.5 mm slices. `20_SAG_MPR` (no recognisable sequence name) was assigned to T1c by
+elimination and flagged. Registered to T1c and to FLAIR, the segmentation was written on that
+sequence's 2.5 mm grid (header identical to the input's):
+
+| Reference | Non-enhancing abnormality cm3 | Enhancing cm3 | Brain mask cm3 |
+|---|---|---|---|
+| T1c | 21.79 | 0.00 | 1246 |
+| FLAIR | 21.83 | 0.00 | 1318 |
+
+DU-7294 is a non-enhancing glioma. The brain-mask volume depends on the sequence HD-BET runs on.
+`test/unit/roles_test.mjs` checks the assignment on several naming schemes; with two
+unrecognised files nothing is assigned by elimination.
+
+**GPU failure during a run.** `test/gpu_loss_test.mjs` starts a GPU (WebGPU) run of the demo case
+and, while HD-BET runs on the GPU, kills the browser's GPU process, as a Windows driver reset
+(TDR) would. ONNX Runtime then failed with the error reported from the field (`failed to call
+OrtRun() ... webgpu/buffer_manager.cc:669`). HD-BET restarted on the CPU and the run finished
+there; the volumes (enhancing 7.73, non-enhancing 13.92, brain 1656 cm3) and the segmentation file
+are identical to v1.0.0's CPU result. The viewer, whose WebGL context the GPU reset destroys, was
+rebuilt and drew the result; the page noted the fallback and set *Automatic* to use the CPU on
+that computer from then on.
+
+**Memory.** A run peaks at about 3 GB in the browser process. Two runs at once on the 7 GB test
+machine exceeded its memory limit and one browser tab was stopped by the system.
 
 ## Run time
 

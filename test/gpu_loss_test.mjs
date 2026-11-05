@@ -22,8 +22,8 @@ await page.click('#runBtn');
 await page.waitForFunction(() => /HD-BET: patch \d+\/\d+ \(GPU\)/.test(document.querySelector('#steps').innerText), null, { timeout: 600000, polling: 1000 });
 const before = await page.$eval('#steps', e => e.innerText.replace(/\s+/g, ' '));
 await page.waitForTimeout(5000);
-const gpuProcs = execSync("pgrep -f 'type=gpu-process' || true").toString().trim().split('\n').filter(Boolean);
-execSync("pkill -9 -f 'type=gpu-process' || true");
+const gpuProcs = execSync("pgrep -f 'type=gpu-proces[s]' || true").toString().trim().split('\n').filter(Boolean);
+execSync("pkill -9 -f 'type=gpu-proces[s]' || true"); // [s]: do not match this shell's own command line
 const killedAt = Date.now();
 await page.waitForTimeout(8000);
 const after = await page.$eval('#steps', e => e.innerText.replace(/\s+/g, ' '));

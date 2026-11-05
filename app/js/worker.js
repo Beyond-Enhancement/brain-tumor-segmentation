@@ -1,5 +1,5 @@
 // Processing worker: input parsing, preprocessing (as in the HD-GLIO README), HD-BET brain
-// extraction, rigid registration, HD-GLIO segmentation and NIfTI export. Nothing leaves the
+// extraction, rigid registration, segmentation (HD-GLIO or an add-on model) and NIfTI export. Nothing leaves the
 // computer: the worker only talks to the page and fetches its own bundled files.
 import { readNifti, writeNifti, isGzip } from './lib/nifti.js';
 import * as G from './lib/geom.js';
@@ -11,7 +11,7 @@ import { unzipSync, gunzipSync } from '../vendor/fflate.mjs';
 
 const BASE = new URL('../', import.meta.url).href; // app root
 const ROLES = ['T1', 'T1c', 'T2', 'FLAIR'];
-const state = { series: new Map(), parsedDicom: [], result: null, cancel: null, models: {}, nets: {} };
+const state = { series: new Map(), parsedDicom: [], result: null, cancel: null, models: {}, nets: {}, addonErrors: [] };
 
 const post = (type, data, transfer) => self.postMessage({ type, ...data }, transfer || []);
 const progress = (stage, frac, text) => post('progress', { stage, frac, text });
@@ -20,7 +20,13 @@ const now = () => performance.now();
 self.onmessage = async ev => {
   const m = ev.data;
   try {
-    if (m.type === 'init') { state.cancel = m.cancel ? new Int32Array(m.cancel) : null; post('ready', { gpu: await gpuInfo(), threads: navigator.hardwareConcurrency || 1 }); }
+    if (m.type === 'init') {
+      state.cancel = m.cancel ? new Int32Array(m.cancel) : null;
+      post('ready', { gpu: await gpuInfo(), threads: navigator.hardwareConcurrency || 1 });
+      await loadLauncherAddons();
+      await postModels();
+    }
+    else if (m.type === 'addon') { try { await registerAddon(m.name, new Uint8Array(m.buffer)); } catch (e) { state.addonErrors.push(e.message); } await postModels(m.name); }
     else if (m.type === 'clear') { state.series.clear(); state.parsedDicom = []; state.result = null; post('cleared', {}); }
     else if (m.type === 'files') await loadFiles(m.files);
     else if (m.type === 'run') await run(m.assignment, m.options);
@@ -136,8 +142,63 @@ async function loadModelConfig(name) {
   if (!r.ok) throw new Error('Model ' + name + ' is not bundled with this build');
   const cfg = await r.json();
   cfg.dir = 'models/' + name + '/';
+  cfg.id = name;
   state.models[name] = cfg;
   return cfg;
+}
+
+// ---------------------------------------------------------------------------------------
+// Segmentation models: HD-GLIO is built in; other networks come as add-on files (*.btsmodel, a
+// zip of config.json, model.onnx and weights.pack) placed next to the program, which the launcher
+// lists, or opened with the page's "Add model file" button. Each is checked before it is offered.
+
+const ADDON_FORMAT = 1;
+const hex = buf => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+
+async function registerAddon(name, u8) {
+  let z;
+  try { z = unzipSync(u8); } catch (e) { throw new Error(name + ': not a workbench model file'); }
+  const get = n => z[n] || z[Object.keys(z).find(k => k.endsWith('/' + n))];
+  const cj = get('config.json');
+  if (!cj) throw new Error(name + ': not a workbench model file (no config.json)');
+  const cfg = JSON.parse(new TextDecoder().decode(cj));
+  if ((cfg.addonFormat || 0) !== ADDON_FORMAT) throw new Error(name + ': made for a different version of the workbench');
+  if (!/^[a-z0-9_-]{2,40}$/.test(cfg.id || '') || cfg.id === 'hdglio' || cfg.id === 'hdbet') throw new Error(name + ': invalid model id');
+  if (![1, 2].includes(cfg.nnunet) || !Array.isArray(cfg.inputChannels) || !cfg.inputChannels.every(c => ROLES.includes(c))) throw new Error(name + ': unsupported model');
+  const onnx = get(cfg.onnx), pack = get(cfg.weights && cfg.weights.pack);
+  if (!onnx || !pack) throw new Error(name + ': network files missing');
+  const digest = hex(await crypto.subtle.digest('SHA-256', pack));
+  if (digest !== cfg.weights.sha256) throw new Error(name + ': the file is damaged (checksum does not match)');
+  cfg.inline = { [cfg.onnx]: onnx, [cfg.weights.pack]: pack };
+  cfg.source = name;
+  for (const k of Object.keys(state.nets)) if (k.startsWith(cfg.id + ':')) { await state.nets[k].release(); delete state.nets[k]; }
+  state.models[cfg.id] = cfg;
+  return cfg;
+}
+
+async function loadLauncherAddons() {
+  let list;
+  try {
+    const r = await fetch(BASE + '__bts/addons', { cache: 'no-store' });
+    if (!r.ok) return;
+    list = await r.json();
+  } catch (e) { return; }
+  for (const a of list) {
+    try {
+      const r = await fetch(BASE + '__bts/addons/' + encodeURIComponent(a.name), { cache: 'no-store' });
+      if (!r.ok) throw new Error(a.name + ': could not be read');
+      await registerAddon(a.name, new Uint8Array(await r.arrayBuffer()));
+    } catch (e) { state.addonErrors.push(e.message); }
+  }
+}
+
+async function postModels(added) {
+  try { await loadModelConfig('hdglio'); } catch (e) { /* reported when run */ }
+  const list = Object.values(state.models).filter(c => c.id !== 'hdbet' && (c.id === 'hdglio' || c.source)).map(c => ({
+    id: c.id, name: c.name, version: c.version, source: c.source || null, license: c.license || null, citation: c.citation || null,
+    labels: c.labels, compartments: c.compartments, weights: c.weights.format,
+  })).sort((a, b) => (a.id === 'hdglio' ? -1 : b.id === 'hdglio' ? 1 : a.name.localeCompare(b.name)));
+  post('models', { list, errors: state.addonErrors.splice(0), added: added || null });
 }
 
 async function getNetwork(name, backend) {
@@ -244,18 +305,21 @@ async function run(assignment, opt) {
   const masked = {};
   for (const r of ROLES) { const d = new Float32Array(onRef[r]); for (let i = 0; i < d.length; i++) if (!brain[i]) d[i] = 0; masked[r] = d; }
 
-  // 5) HD-GLIO
-  progress('hdglio', 0, 'Loading HD-GLIO');
-  const gcfg = await loadModelConfig('hdglio');
+  // 5) tumor segmentation (HD-GLIO, or an add-on model)
+  const modelId = opt.model || 'hdglio';
+  if (modelId !== 'hdglio' && !state.models[modelId]) throw new Error('The selected model is not loaded. Add its model file again.');
+  const gcfg = await loadModelConfig(modelId);
+  const mname = gcfg.short || gcfg.name;
+  progress('hdglio', 0, 'Loading ' + mname);
   const chans = gcfg.inputChannels.map(r => masked[r]);
-  const { res } = await runNetwork('hdglio', 'HD-GLIO', 'hdglio', chans, npShape(grid.dims), npSpacing(grid.affine), !!opt.tta, ctx, netProgress('hdglio', 'HD-GLIO'));
+  const { res } = await runNetwork(modelId, mname, 'hdglio', chans, npShape(grid.dims), npSpacing(grid.affine), !!opt.tta, ctx, netProgress('hdglio', mname));
   const seg = res.seg;
   backend = ctx.backend;
   T.hdglio = now();
 
   // 6) volumes
   const vv = G.voxelVolume(grid.affine);
-  const counts = new Array(gcfg.numClasses).fill(0);
+  const counts = new Array(256).fill(0); // by label value (BraTS uses 1, 2, 4)
   for (const v of seg) counts[v]++;
   const comps = gcfg.compartments.map(c => {
     const n = c.labels.reduce((a, l) => a + counts[l], 0);
@@ -282,7 +346,7 @@ async function run(assignment, opt) {
   post('result', {
     vols, comps, brainCm3, tumorCenterMM, voxelVolume: vv, voxelSize: G.spacing(grid.affine), dims: grid.dims, reg, refRole,
     backend, gpu, gpuFailed: ctx.gpuFailed, usedGpu: ctx.usedGpu && !ctx.gpuFailed, timing, notes: log, tta: !!opt.tta, labels: gcfg.labels, compartments: gcfg.compartments,
-    model: { name: gcfg.name, version: gcfg.version, weights: gcfg.weights.format }, bet: opt.skullStrip ? (await loadModelConfig('hdbet')).version : null,
+    model: { id: gcfg.id, name: gcfg.name, version: gcfg.version, weights: gcfg.weights.format, source: gcfg.source || null, citation: gcfg.citation || null, license: gcfg.license || null }, bet: opt.skullStrip ? (await loadModelConfig('hdbet')).version : null,
   }, transfer);
 }
 
@@ -341,11 +405,12 @@ function doExport(what, reqId) {
   const R = state.result;
   if (!R) throw new Error('Nothing to export yet');
   let vol, dtype = 'f32', name, descrip;
-  if (what === 'seg') { vol = toOutputGrid(R.seg, Uint8Array); dtype = 'u8'; name = 'hdglio_segmentation.nii.gz'; descrip = 'HD-GLIO segmentation'; }
+  const prefix = (R.cfg && R.cfg.id) || 'hdglio';
+  if (what === 'seg') { vol = toOutputGrid(R.seg, Uint8Array); dtype = 'u8'; name = prefix + '_segmentation.nii.gz'; descrip = (R.cfg.name || 'HD-GLIO').slice(0, 60) + ' segmentation'; }
   else if (what === 'brain') { vol = toOutputGrid(R.brain, Uint8Array); dtype = 'u8'; name = 'hdbet_brain_mask.nii.gz'; descrip = 'HD-BET brain mask'; }
   else if (what.startsWith('input:')) {
     const r = what.slice(6);
-    vol = toOutputGrid(R.masked[r], Float32Array); name = 'hdglio_input_' + r.toLowerCase() + '.nii.gz'; descrip = r + ' registered, brain-extracted';
+    vol = toOutputGrid(R.masked[r], Float32Array); name = prefix + '_input_' + r.toLowerCase() + '.nii.gz'; descrip = r + ' registered, brain-extracted';
   } else if (what.startsWith('reg:')) {
     const r = what.slice(4);
     vol = toOutputGrid(R.onRef[r], Float32Array); name = 'registered_' + r.toLowerCase() + '.nii.gz'; descrip = r + ' registered to ' + R.refRole;

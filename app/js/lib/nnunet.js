@@ -316,9 +316,14 @@ export async function predictCase(channels, shapeNp, spacingNp, cfg, runPatch, o
     const pk = probs.subarray(k * np, (k + 1) * np);
     back.push(needResample ? resampleNp(pk, newShape, cs, cfg.resampleProb.order, cfg.resampleProb.orderZ, zAxB) : new Float32Array(pk));
   }
-  // 6) argmax, uncrop, transpose back
+  // 6) labels (argmax; or for region-based models, nnU-Net's region_class_order: each region's
+  //    sigmoid > 0.5 writes its label, later regions overwriting earlier ones), uncrop, transpose back
   const segC = new Uint8Array(nc);
-  for (let v = 0; v < nc; v++) { let best = 0, bv = back[0][v]; for (let k = 1; k < K; k++) if (back[k][v] > bv) { bv = back[k][v]; best = k; } segC[v] = best; }
+  if (cfg.regionClassOrder) {
+    cfg.regionClassOrder.forEach((lab, i) => { const r = back[i]; for (let v = 0; v < nc; v++) if (r[v] > 0.5) segC[v] = lab; });
+  } else {
+    for (let v = 0; v < nc; v++) { let best = 0, bv = back[0][v]; for (let k = 1; k < K; k++) if (back[k][v] > bv) { bv = back[k][v]; best = k; } segC[v] = best; }
+  }
   const segT = new Float32Array(n0);
   for (let a = 0; a < cs[0]; a++) for (let b = 0; b < cs[1]; b++) for (let c = 0; c < cs[2]; c++) segT[((a + lo[0]) * shape[1] + (b + lo[1])) * shape[2] + c + lo[2]] = segC[(a * cs[1] + b) * cs[2] + c];
   const segBack = transpose3(segT, shape, tb).data;
@@ -326,6 +331,12 @@ export async function predictCase(channels, shapeNp, spacingNp, cfg, runPatch, o
   // 7) postprocessing (connected components), on the original grid
   if (cfg.postprocessing && cfg.postprocessing.forWhichClasses && cfg.postprocessing.forWhichClasses.length) {
     keepLargestComponents(seg, shapeNp, cfg.postprocessing.forWhichClasses, spacingNp[0] * spacingNp[1] * spacingNp[2], cfg.postprocessing.minValidObjectSizes);
+  }
+  // 8) optional relabelling to the published convention (e.g. BraTS: 1 NCR, 2 ED, 4 ET)
+  if (cfg.labelMap) {
+    const lut = new Uint8Array(256); for (let i = 0; i < 256; i++) lut[i] = i;
+    for (const [from, to] of Object.entries(cfg.labelMap)) lut[+from] = to;
+    for (let v = 0; v < seg.length; v++) seg[v] = lut[seg[v]];
   }
   return { seg, info: { cropShape: cs, preShape: newShape, separateZ: zAx, separateZBack: zAxB, bbox: [lo, hi] } };
 }

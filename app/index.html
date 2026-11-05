@@ -43,6 +43,11 @@
 
     <section>
       <h2>Processing options</h2>
+      <label class="field">Segmentation model
+        <select id="optModel"><option value="hdglio">HD-GLIO</option></select>
+      </label>
+      <p class="muted small" id="modelNote"></p>
+      <div class="row left"><button id="addModelBtn" class="ghost">Add model file</button><input type="file" id="modelInput" accept=".btsmodel" hidden></div>
       <label class="field">Register to
         <select id="optRefSeq">
           <option value="T1" selected>T1 (as published)</option>

@@ -6,4 +6,6 @@ dist/
 # test outputs and local model sources
 test/out/
 weights_src/
+# exported add-on model folders (the packaged .btsmodel files go to downloads/)
+addons/
 __pycache__/

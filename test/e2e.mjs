@@ -35,6 +35,8 @@ if (dicom) {
 await page.waitForFunction(() => [...document.querySelectorAll('#roles select')].filter(s => s.value).length === 4, null, { timeout: 120000 });
 const roles = await page.$$eval('#roles .role', rows => rows.map(r => r.querySelector('.tag').textContent + ' = ' + r.querySelector('select').selectedOptions[0].textContent));
 if (tta) await page.check('#optTta');
+const modelArg = arg('--model');
+if (modelArg) { await page.waitForFunction(m => [...document.querySelectorAll('#optModel option')].some(o => o.value === m), modelArg, { timeout: 60000 }); await page.selectOption('#optModel', modelArg); }
 const refArg = arg('--ref');
 if (refArg) await page.selectOption('#optRefSeq', refArg);
 const roleMeta = await page.$$eval('#roles .role .meta', m => m.map(x => x.textContent));

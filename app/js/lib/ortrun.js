@@ -68,6 +68,7 @@ export class Network {
     await loadOrt(base);
     const dir = base + cfg.dir;
     const fetchBytes = async name => {
+      if (cfg.inline && cfg.inline[name]) return cfg.inline[name]; // add-on model held in memory
       const r = await fetch(dir + name);
       if (!r.ok) throw new Error('Missing model file ' + name);
       return new Uint8Array(await r.arrayBuffer());

@@ -8,6 +8,7 @@ repositories and records linked here.
 | Model | Source | License | Where it is used |
 |---|---|---|---|
 | HD-GLIO v2 network parameters | Kickingereder P, Isensee F. Zenodo [10.5281/zenodo.4014850](https://doi.org/10.5281/zenodo.4014850) (`hd_glio_v2_params.zip`, md5 65704898365b11630887389a90c10122) | CC BY 4.0 | `app/models/hdglio/`, converted to ONNX |
+| nnU-Net BraTS 2020 parameters (add-on, not in the executables) | Isensee F. Zenodo [10.5281/zenodo.4635763](https://doi.org/10.5281/zenodo.4635763) (`Task082_nnUNetTrainerV2BraTSRegions_DA4_BN_BD__nnUNetPlansv2.1_bs5_5fold.zip`, md5 b6c771f4921f0a62852e842e4b91d6d0; fold 0 used) | CC BY 4.0 | `downloads/*-BraTS2020-nnUNet.btsmodel`, converted to ONNX (16-bit weights) |
 | HD-BET v1.5 parameters (HD-BET 2.0 package) | Isensee F, Schell M, Tursunova I, et al. Zenodo [10.5281/zenodo.14445620](https://doi.org/10.5281/zenodo.14445620) (`release_v1.5.0.zip`, md5 f97a36f89f8eb3071ff05c6f9ac66b56) | **CC BY-NC 4.0 (non-commercial)** | `app/models/hdbet/`, converted to ONNX |
 
 The networks were converted with `build/export_models.py`. The weights are stored at reduced
@@ -21,6 +22,9 @@ Please cite when using results:
   retrospective study. Lancet Oncol. 2019;20(5):728-740. doi:10.1016/S1470-2045(19)30098-1
 - Isensee F, Schell M, Pflueger I, et al. Automated brain extraction of multisequence MRI using
   artificial neural networks. Hum Brain Mapp. 2019;40(17):4952-4964. doi:10.1002/hbm.24750
+- Isensee F, Jaeger PF, Full PM, Vollmuth P, Maier-Hein KH. nnU-Net for brain tumor
+  segmentation. In: Brainlesion: Glioma, Multiple Sclerosis, Stroke and Traumatic Brain Injuries
+  (BrainLes 2020). LNCS 12659. Springer; 2021:118-132. (BraTS 2020 add-on model)
 - Isensee F, Jaeger PF, Kohl SAA, Petersen J, Maier-Hein KH. nnU-Net: a self-configuring method
   for deep learning-based biomedical image segmentation. Nat Methods. 2021;18(2):203-211.
 

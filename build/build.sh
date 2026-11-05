@@ -4,11 +4,12 @@
 #   dist/BrainTumorSegmentationWorkbench-macOS-AppleSilicon.zip  macOS 11+, Apple M-series
 #   dist/BrainTumorSegmentationWorkbench-macOS-Intel.zip     macOS 11+, Intel
 #   dist/btsw-linux-amd64                                    Linux, x64 (used by the tests)
+#   dist/*.btsmodel                                          add-on models, if exported into addons/
 # Needs Go >= 1.22 and Python 3 with Pillow. Cross-compiles from any OS; no cgo.
 # The models must have been exported first (build/export_models.py).
 set -euo pipefail
 cd "$(dirname "$0")/.."
-VERSION="1.0.1"  # keep in sync with appVer in launcher/main.go
+VERSION="1.1.0"  # keep in sync with appVer in launcher/main.go
 NAME="Brain Tumor Segmentation Workbench"
 
 python3 build/prepare_site.py
@@ -33,5 +34,11 @@ mac_zip() {  # mac_zip <binary> <zip name>
 }
 mac_zip build/tmp/btsw-darwin-arm64 BrainTumorSegmentationWorkbench-macOS-AppleSilicon.zip
 mac_zip build/tmp/btsw-darwin-amd64 BrainTumorSegmentationWorkbench-macOS-Intel.zip
-( cd dist && sha256sum BrainTumorSegmentationWorkbench.exe BrainTumorSegmentationWorkbench-macOS-*.zip btsw-linux-amd64 > SHA256SUMS.txt && cat SHA256SUMS.txt )
+# add-on model files (exported with build/export_models.py into addons/<id>/)
+ADDONS=()
+if [ -f addons/brats2020/config.json ]; then
+  python3 build/package_addon.py addons/brats2020 dist/BrainTumorSegmentationWorkbench-model-BraTS2020-nnUNet.btsmodel
+  ADDONS+=(BrainTumorSegmentationWorkbench-model-BraTS2020-nnUNet.btsmodel)
+fi
+( cd dist && sha256sum BrainTumorSegmentationWorkbench.exe BrainTumorSegmentationWorkbench-macOS-*.zip "${ADDONS[@]}" btsw-linux-amd64 > SHA256SUMS.txt && cat SHA256SUMS.txt )
 ls -la dist

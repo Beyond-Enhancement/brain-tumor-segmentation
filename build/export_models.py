@@ -26,9 +26,16 @@ class SoftmaxWrap(torch.nn.Module):
         return torch.softmax(self.net(x), 1)
 
 
-def export_onnx(net, in_ch, patch, path, softmax):
+class SigmoidWrap(torch.nn.Module):
+    def __init__(self, net):
+        super().__init__(); self.net = net
+    def forward(self, x):
+        return torch.sigmoid(self.net(x))
+
+
+def export_onnx(net, in_ch, patch, path, softmax, sigmoid=False):
     net.eval()
-    model = SoftmaxWrap(net) if softmax else net
+    model = SigmoidWrap(net) if sigmoid else SoftmaxWrap(net) if softmax else net
     x = torch.zeros(1, in_ch, *patch)
     with torch.no_grad():
         torch.onnx.export(model, x, path, opset_version=17, input_names=['input'], output_names=['output'], dynamo=False,
@@ -133,13 +140,71 @@ def export_hdglio(folder, out_dir, q8):
         # label meaning from the model's own dataset properties (class_dct: 1 'edema', 2 'km' =
         # Kontrastmittel, i.e. contrast-enhancing), named as in Kickingereder et al. 2019
         'classNamesInModel': {str(k): v for k, v in plans['dataset_properties']['class_dct'].items()},
-        'labels': [{'value': 1, 'name': 'Non-enhancing T2/FLAIR abnormality', 'short': 'NE'},
-                   {'value': 2, 'name': 'Contrast-enhancing tumor', 'short': 'CE'}],
+        'labels': [{'value': 1, 'name': 'Non-enhancing T2/FLAIR abnormality', 'short': 'NE', 'color': [255, 210, 63]},
+                   {'value': 2, 'name': 'Contrast-enhancing tumor', 'short': 'CE', 'color': [255, 77, 77]}],
         'compartments': [{'key': 'ce', 'name': 'Contrast-enhancing tumor', 'labels': [2]},
                          {'key': 'ne', 'name': 'Non-enhancing T2/FLAIR abnormality', 'labels': [1]},
                          {'key': 'total', 'name': 'Total abnormality (CE + NE)', 'labels': [1, 2]}],
     }
     assert cfg['classNamesInModel'] == {'0': 'background', '1': 'edema', '2': 'km'}, cfg['classNamesInModel']
+    return cfg
+
+
+def export_brats2020(folder, out_dir, q8, fold=0):
+    """One network of Isensee et al.'s BraTS 2020 nnU-Net (region-based, batch norm), Zenodo 4635763."""
+    allow_numpy_in_checkpoints()
+    from nnunet.training.model_restore import load_model_and_checkpoint_files
+    from nnunet.inference.predict import load_postprocessing
+    trainer, params = load_model_and_checkpoint_files(folder, (fold,), mixed_precision=False, checkpoint_name='model_final_checkpoint')
+    trainer.load_checkpoint_ram(params[0], False)
+    net = trainer.network
+    net.do_ds = False
+    net.cpu().float().eval()
+    assert isinstance(net.inference_apply_nonlin, torch.nn.Sigmoid), 'expected a region-based (sigmoid) trainer'
+    plans, stage = trainer.plans, trainer.stage
+    stage_plans = plans['plans_per_stage'][stage]
+    patch = [int(p) for p in trainer.patch_size]
+    n_in = int(trainer.num_input_channels)
+    norm, use_mask = plans['normalization_schemes'], plans['use_mask_for_norm']
+    pp = None
+    pjson = os.path.join(folder, 'postprocessing.json')
+    if os.path.isfile(pjson):
+        fw, mv = load_postprocessing(pjson)
+        pp = {'forWhichClasses': [list(c) if isinstance(c, (list, tuple)) else int(c) for c in fw],
+              'minValidObjectSizes': {str(k): v for k, v in (mv or {}).items()} if mv else None}
+    export_onnx(net, n_in, patch, os.path.join(out_dir, 'full.onnx'), softmax=False, sigmoid=True)
+    w = pack_weights(os.path.join(out_dir, 'full.onnx'), out_dir, q8)
+    os.remove(os.path.join(out_dir, 'full.onnx'))
+    sep = trainer.segmentation_export_params if hasattr(trainer, 'segmentation_export_params') else {}
+    cfg = {
+        'id': 'brats2020', 'addonFormat': 1, 'short': 'nnU-Net BraTS',
+        'name': 'nnU-Net BraTS 2020', 'version': 'one network (fold %d) of the BraTS 2020 ensemble, Zenodo 4635763' % fold, 'nnunet': 1,
+        'trainer': type(trainer).__name__, 'stage': stage, 'fold': fold,
+        'inputChannels': ['T1', 'T1c', 'T2', 'FLAIR'], 'numClasses': len(trainer.regions),
+        'regions': {k: list(v) for k, v in trainer.regions.items()}, 'regionClassOrder': [int(c) for c in trainer.regions_class_order],
+        'transposeForward': [int(a) for a in plans['transpose_forward']], 'transposeBackward': [int(a) for a in plans['transpose_backward']],
+        'targetSpacing': [float(s) for s in stage_plans['current_spacing']], 'patchSize': patch,
+        'normalization': [{'scheme': norm[i], 'useMask': bool(use_mask[i])} for i in range(n_in)],
+        'mirrorAxes': [int(a) for a in trainer.data_aug_params.get('mirror_axes', (0, 1, 2))], 'stepSize': 0.5,
+        'aggregate': 'sigmoid', 'anisotropyThreshold': 3,
+        'resampleData': {'order': 3, 'orderZ': 0}, 'resampleProb': {'order': int(sep.get('interpolation_order', 1)), 'orderZ': int(sep.get('interpolation_order_z', 0))},
+        'postprocessing': pp, 'onnx': 'model.onnx', 'weights': w,
+        # nnU-Net Task082 labels (1 edema, 2 non-enhancing/necrosis, 3 enhancing) back to the BraTS
+        # convention, as nnunet.dataset_conversion convert_labels_back_to_BraTS does
+        'labelMap': {'1': 2, '2': 1, '3': 4},
+        'labels': [{'value': 1, 'name': 'Necrosis / non-enhancing tumor core (NCR)', 'short': 'NCR', 'color': [80, 160, 255]},
+                   {'value': 2, 'name': 'Peritumoral edema / infiltrated tissue (ED)', 'short': 'ED', 'color': [255, 210, 63]},
+                   {'value': 4, 'name': 'Enhancing tumor (ET)', 'short': 'ET', 'color': [255, 77, 77]}],
+        'compartments': [{'key': 'et', 'name': 'Enhancing tumor (ET)', 'labels': [4]},
+                         {'key': 'ncr', 'name': 'Necrosis / non-enhancing core (NCR)', 'labels': [1]},
+                         {'key': 'ed', 'name': 'Edema / infiltrated tissue (ED)', 'labels': [2]},
+                         {'key': 'tc', 'name': 'Tumor core (TC = ET + NCR)', 'labels': [1, 4]},
+                         {'key': 'wt', 'name': 'Whole tumor (WT = ET + NCR + ED)', 'labels': [1, 2, 4]}],
+        'citation': 'Isensee F, Jaeger PF, Full PM, Vollmuth P, Maier-Hein KH. nnU-Net for brain tumor segmentation. BrainLes 2020, LNCS 12659:118-132.',
+        'license': 'CC BY 4.0',
+    }
+    assert cfg['regions'] == {'whole tumor': [1, 2, 3], 'tumor core': [2, 3], 'enhancing tumor': [3]}, cfg['regions']
+    assert cfg['regionClassOrder'] == [1, 2, 3]
     return cfg
 
 
@@ -184,14 +249,14 @@ def export_hdbet(folder, out_dir, q8):
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
-    ap.add_argument('model', choices=['hdglio', 'hdbet'])
+    ap.add_argument('model', choices=['hdglio', 'hdbet', 'brats2020'])
     ap.add_argument('folder')
     ap.add_argument('--q8', action='store_true', help='int8 weights (smaller, slightly less exact)')
     ap.add_argument('--out', default=None)
     a = ap.parse_args()
     out_dir = a.out or os.path.join(OUT, a.model)
     os.makedirs(out_dir, exist_ok=True)
-    cfg = (export_hdglio if a.model == 'hdglio' else export_hdbet)(a.folder, out_dir, a.q8)
+    cfg = {'hdglio': export_hdglio, 'hdbet': export_hdbet, 'brats2020': export_brats2020}[a.model](a.folder, out_dir, a.q8)
     json.dump(cfg, open(os.path.join(out_dir, 'config.json'), 'w'), indent=1)
     sz = sum(os.path.getsize(os.path.join(out_dir, f)) for f in os.listdir(out_dir))
     print(a.model, 'exported to', out_dir, '(%.1f MB)' % (sz / 1e6))

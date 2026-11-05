@@ -7,7 +7,7 @@ const STEPS = [
   { key: 'prepare', name: 'Prepare and reorient' },
   { key: 'hdbet', name: 'Brain extraction (HD-BET)' },
   { key: 'register', name: 'Registration', dynamic: () => 'Registration to ' + (ui.runRef || refSeq()) },
-  { key: 'hdglio', name: 'Tumor segmentation (HD-GLIO)' },
+  { key: 'hdglio', name: 'Tumor segmentation', dynamic: () => 'Tumor segmentation (' + (ui.runModelName || modelName()) + ')' },
 ];
 const COLORS = { 1: [255, 210, 63], 2: [255, 77, 77], 3: [80, 160, 255], 4: [120, 230, 140] };
 
@@ -24,6 +24,7 @@ worker.onmessage = ev => {
   const m = ev.data;
   if (m.type === 'ready') { ui.env = m; showDevice(); }
   else if (m.type === 'series') onSeries(m);
+  else if (m.type === 'models') onModels(m);
   else if (m.type === 'progress') onProgress(m);
   else if (m.type === 'result') onResult(m);
   else if (m.type === 'export') { const f = pendingExports.get(m.id); pendingExports.delete(m.id); download(m.name, new Blob([m.bytes], { type: 'application/gzip' })); if (f) f(); }
@@ -156,6 +157,38 @@ function renderRoles() {
 }
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+// segmentation models: HD-GLIO built in; add-on model files found next to the program or added here
+ui.models = [{ id: 'hdglio', name: 'HD-GLIO' }];
+const modelName = () => { const md = ui.models.find(x => x.id === $('#optModel').value); return md ? md.name : 'HD-GLIO'; };
+function onModels(m) {
+  ui.models = m.list.length ? m.list : ui.models;
+  const sel = $('#optModel');
+  let want = sel.value;
+  try { want = m.added ? (ui.models.find(x => x.source === m.added) || {}).id || want : localStorage.getItem('btsw.model') || want; } catch (e) { /* ignore */ }
+  sel.innerHTML = ui.models.map(md => `<option value="${esc(md.id)}">${esc(md.name)}${md.source ? ' (add-on)' : ''}</option>`).join('');
+  sel.value = ui.models.some(md => md.id === want) ? want : 'hdglio';
+  updateModelNote();
+  for (const e of m.errors || []) toast('Model file not used: ' + e, true);
+  if (m.added && !m.errors.length) toast('Model added: ' + modelName() + '.');
+}
+function updateModelNote() {
+  const md = ui.models.find(x => x.id === $('#optModel').value) || {};
+  const comps = (md.compartments || []).map(c => (c.name.match(/\(([^)]*)\)\s*$/) || [])[1] || c.name).filter(Boolean);
+  $('#modelNote').textContent = md.id === 'hdglio' || !md.id
+    ? 'HD-GLIO (Kickingereder et al. 2019): contrast-enhancing tumor and non-enhancing T2/FLAIR abnormality; no necrosis class.'
+    : md.name + (md.version ? ', ' + md.version : '') + '. Compartments: ' + comps.join(', ') + '.' + (md.license ? ' License ' + md.license + '.' : '') + ' From ' + md.source + '.';
+  if (!ui.running && document.querySelector('#steps li')) renderSteps(null);
+}
+$('#optModel').addEventListener('change', () => { try { localStorage.setItem('btsw.model', $('#optModel').value); } catch (e) { /* ignore */ } updateModelNote(); });
+$('#addModelBtn').onclick = () => $('#modelInput').click();
+$('#modelInput').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  toast('Checking ' + f.name + ' ...');
+  const buffer = await f.arrayBuffer();
+  worker.postMessage({ type: 'addon', name: f.name, buffer }, [buffer]);
+};
+
 // reference sequence and grid: remembered in this browser
 const refSeq = () => $('#optRefSeq').value;
 function updateRefLabels() {
@@ -229,7 +262,7 @@ $('#runBtn').onclick = () => {
   renderSteps('prepare');
   $('#runBtn').disabled = true; $('#cancelBtn').hidden = !cancelFlag;
   const options = {
-    reference: (ui.runRef = refSeq()), isotropic: $('#optGrid').value === 'iso', skullStrip: $('#optBet').checked, register: $('#optReg').checked,
+    model: (ui.runModelName = modelName(), $('#optModel').value), reference: (ui.runRef = refSeq()), isotropic: $('#optGrid').value === 'iso', skullStrip: $('#optBet').checked, register: $('#optReg').checked,
     tta: $('#optTta').checked, device: $('#optDevice').value, avoidGpu: gpuFailedBefore(),
   };
   worker.postMessage({ type: 'run', assignment: { ...ui.assignment }, options });
@@ -309,7 +342,7 @@ function labelLut() {
   const R = [0], Gc = [0], B = [0], A = [0], I = [0], names = ['background'];
   for (let v = 1; v <= K; v++) {
     const lab = cfg.labels.find(l => l.value === v) || { name: 'label ' + v };
-    const c = COLORS[v] || [200, 200, 200];
+    const c = lab.color || COLORS[v] || [200, 200, 200];
     R.push(c[0]); Gc.push(c[1]); B.push(c[2]); A.push(ui.hidden.has(v) ? 0 : 255); I.push(v); names.push(lab.name);
   }
   return { R, G: Gc, B, A, I, labels: names };
@@ -390,7 +423,8 @@ function renderVolumes() {
     const tr = document.createElement('tr');
     const single = c.labels.length === 1 ? c.labels[0] : null;
     if (!single) tr.className = 'total';
-    const col = single ? COLORS[single] : null;
+    const labc = single ? m.labels.find(l => l.value === single) : null;
+    const col = single ? (labc && labc.color) || COLORS[single] : null;
     tr.innerHTML = `<td class="sw">${col ? `<span class="swatch${ui.hidden.has(single) ? ' off' : ''}" data-l="${single}" title="Show or hide" style="background:rgb(${col.join(',')})"></span>` : ''}</td><td>${esc(c.name)}</td><td class="num">${fmtVol(c.cm3)}</td>`;
     tb.appendChild(tr);
   }
@@ -419,7 +453,7 @@ function renderQC() {
   $('#runInfo').innerHTML = `<div class="qc"><span>Model</span><span>${esc(m.model.name)} ${esc(m.model.version || '')}${wf ? ', ' + wf : ''}</span>` +
     (m.bet ? `<span>Brain mask</span><span>HD-BET ${esc(m.bet)}</span>` : '') +
     `<span>Compute</span><span>${dev}</span><span>Augmentation</span><span>${m.tta ? '8 mirrored passes' : 'off'}</span>` +
-    `<span>Time</span><span>${fmtMs(tm.total)} (prepare ${fmtMs(tm.prepare)}, HD-BET ${fmtMs(tm.hdbet)}, registration ${fmtMs(tm.register)}, HD-GLIO ${fmtMs(tm.hdglio)})</span></div>` +
+    `<span>Time</span><span>${fmtMs(tm.total)} (prepare ${fmtMs(tm.prepare)}, HD-BET ${fmtMs(tm.hdbet)}, registration ${fmtMs(tm.register)}, ${esc((m.model && m.model.id !== 'hdglio' ? 'segmentation' : 'HD-GLIO'))} ${fmtMs(tm.hdglio)})</span></div>` +
     (m.notes.length ? '<p class="warn">' + m.notes.map(esc).join('<br>') + '</p>' : '');
 }
 

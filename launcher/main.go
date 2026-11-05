@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -31,9 +32,10 @@ var siteFS embed.FS
 
 const (
 	appName   = "Brain Tumor Segmentation Workbench"
-	appVer    = "1.0.1"
+	appVer    = "1.1.0"
 	pingPath  = "/__bts/ping"
 	eventPath = "/__bts/events"
+	addonPath = "/__bts/addons" // add-on model files (*.btsmodel) found next to the executable
 	pingReply = "brain-tumor-segmentation-workbench"
 
 	// A fixed port keeps the page origin stable between runs.
@@ -76,8 +78,14 @@ type liveness struct {
 	started  time.Time
 }
 
-func (l *liveness) touch()      { l.mu.Lock(); l.lastSeen = time.Now(); l.mu.Unlock() }
-func (l *liveness) connect()    { l.mu.Lock(); l.clients++; l.ever = true; l.lastSeen = time.Now(); l.mu.Unlock() }
+func (l *liveness) touch() { l.mu.Lock(); l.lastSeen = time.Now(); l.mu.Unlock() }
+func (l *liveness) connect() {
+	l.mu.Lock()
+	l.clients++
+	l.ever = true
+	l.lastSeen = time.Now()
+	l.mu.Unlock()
+}
 func (l *liveness) disconnect() { l.mu.Lock(); l.clients--; l.lastSeen = time.Now(); l.mu.Unlock() }
 func (l *liveness) busy() bool  { l.mu.Lock(); defer l.mu.Unlock(); return l.clients > 0 }
 
@@ -211,6 +219,16 @@ func newHandler(port int, live *liveness) http.Handler {
 		case eventPath:
 			serveEvents(w, r, live)
 			return
+		case addonPath:
+			h.Set("Content-Type", "application/json")
+			h.Set("Cache-Control", "no-store")
+			b, _ := json.Marshal(listAddons())
+			w.Write(b)
+			return
+		}
+		if strings.HasPrefix(r.URL.Path, addonPath+"/") {
+			serveAddon(w, r)
+			return
 		}
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -247,6 +265,74 @@ func newHandler(port int, live *liveness) http.Handler {
 		}
 		files.ServeHTTP(w, r)
 	})
+}
+
+// ---------------------------------------------------------------------------------------
+// Add-on models: optional extra networks shipped as separate *.btsmodel files (too large to
+// embed under GitHub's file-size limit). They are read from the folder that holds this program,
+// listed by name only, and served read-only; nothing else on disk is reachable.
+
+type addon struct {
+	Name string `json:"name"`
+	Size int64  `json:"size"`
+}
+
+func addonDir() string {
+	exe, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	if p, err := filepath.EvalSymlinks(exe); err == nil {
+		exe = p
+	}
+	return filepath.Dir(exe)
+}
+
+func listAddons() []addon {
+	out := []addon{}
+	dir := addonDir()
+	if dir == "" {
+		return out
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return out
+	}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(strings.ToLower(e.Name()), ".btsmodel") {
+			continue
+		}
+		if info, err := e.Info(); err == nil && info.Mode().IsRegular() && info.Size() > 0 && info.Size() < 1<<30 {
+			out = append(out, addon{Name: e.Name(), Size: info.Size()})
+		}
+		if len(out) >= 16 {
+			break
+		}
+	}
+	return out
+}
+
+func serveAddon(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	name := strings.TrimPrefix(r.URL.Path, addonPath+"/")
+	for _, a := range listAddons() {
+		if a.Name == name { // exact match with a listed file: no other paths can be requested
+			f, err := os.Open(filepath.Join(addonDir(), a.Name))
+			if err != nil {
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+			defer f.Close()
+			w.Header().Set("Content-Type", "application/zip")
+			w.Header().Set("Cache-Control", "no-store")
+			http.ServeContent(w, r, a.Name, time.Time{}, f)
+			return
+		}
+	}
+	http.Error(w, "not found", http.StatusNotFound)
 }
 
 // serveEvents holds a long-lived Server-Sent Events stream open for each app window, so the
