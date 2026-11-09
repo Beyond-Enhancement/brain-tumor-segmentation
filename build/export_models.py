@@ -9,6 +9,8 @@ For each model this writes app/models/<name>/:
 Usage:
   build/export_models.py hdglio <hd_glio_params folder>
   build/export_models.py hdbet  <hd-bet release folder (contains fold_all/)>
+  build/export_models.py brats2020 <nnU-Net Task082 trainer folder> --out addons/brats2020
+  build/export_models.py raidionics-flair <MRI_FLAIRChanges/t2f folder> --out addons/raidionics-flair
 """
 import argparse, json, os, sys, tempfile, hashlib
 import numpy as np
@@ -42,8 +44,10 @@ def export_onnx(net, in_ch, patch, path, softmax, sigmoid=False):
                           do_constant_folding=True)
 
 
-def pack_weights(onnx_path, out_dir, q8=False):
-    """Move all initializers to an external fp32 blob, then write a compact pack + index."""
+def pack_weights(onnx_path, out_dir, q8=False, small_f32=False):
+    """Move all initializers to an external fp32 blob, then write a compact pack + index.
+    small_f32: keep tensors with fewer than 2 dimensions (norm statistics, biases, PReLU slopes)
+    in fp32, so that tiny running variances cannot underflow in fp16."""
     m = onnx.load(onnx_path)
     m.ir_version = 10  # ONNX Runtime Web 1.31 reads IR <= 13; opset 17 needs IR >= 8
     ext_name = 'weights.bin'
@@ -62,7 +66,7 @@ def pack_weights(onnx_path, out_dir, q8=False):
         off, ln = int(info.get('offset', 0)), int(info['length'])
         raw = blob[off:off + ln]
         ent = {'name': init.name, 'offset': off, 'bytes': ln}
-        if init.data_type == onnx.TensorProto.FLOAT and ln >= 64:
+        if init.data_type == onnx.TensorProto.FLOAT and ln >= 64 and not (small_f32 and len(init.dims) < 2):
             a = np.frombuffer(raw, dtype='<f4')
             ent['count'] = int(a.size)
             dims = list(init.dims)
@@ -208,6 +212,87 @@ def export_brats2020(folder, out_dir, q8, fold=0):
     return cfg
 
 
+RAIDIONICS_LICENSE = """BSD 2-Clause License
+
+Copyright (c) 2023, David Bouget
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+"""
+
+
+def export_raidionics_flair(folder, out_dir, q8, fold=0):
+    """Raidionics MRI_FLAIRChanges (t2f): FLAIR hyperintensity from FLAIR alone, one fold.
+    folder: the model's 't2f' folder from Raidionics-MRI_FLAIRChanges-v13.zip (Raidionics-models
+    release v1.3.0-rc), holding pre_processing.ini and one sub-folder per fold. The JavaScript
+    follows raidionicsseg 1.5.2 with the runtime settings the Raidionics app and raidionics_rads_lib
+    use (thresholding, resample_first, no overlap, no test-time augmentation, first fold only)."""
+    import configparser
+    ini = configparser.ConfigParser()
+    ini.read(os.path.join(folder, 'pre_processing.ini'))
+    g = lambda s, k: ini[s][k].split('#')[0].strip()
+    floats = lambda s, k: [float(x) for x in g(s, k).split(',')]
+    pre = {
+        'outputSpacing': floats('PreProcessing', 'output_spacing'), 'crop': g('PreProcessing', 'background_cropping'),
+        'clipPercentile': floats('PreProcessing', 'intensity_clipping_range'), 'normalization': g('PreProcessing', 'normalization_method'),
+        'patchSize': [int(v) for v in floats('Training', 'patch_size')], 'patchOffset': [int(v) for v in floats('Training', 'patch_offset')],
+        'numClasses': int(g('Training', 'nb_classes')), 'thresholds': floats('Training', 'optimal_thresholds'),
+        'activation': g('Training', 'activation_layer_type'), 'activationIncluded': g('Training', 'activation_layer_included').lower() == 'true',
+        'channelsOrder': g('PreProcessing', 'channels_order'), 'backend': g('Default', 'training_backend'),
+        'numberInputs': int(g('PreProcessing', 'number_inputs')), 'swapInput': g('PreProcessing', 'swap_training_input').lower() == 'true',
+        'biasCorrection': g('MRI', 'perform_bias_correction').lower() == 'true', 'classes': g('Training', 'classes'),
+    }
+    # the JavaScript implements exactly this configuration; anything else must be checked first
+    expect = {'outputSpacing': [1.0, 1.0, 1.0], 'crop': 'minimum', 'clipPercentile': [0.0, 99.5], 'normalization': 'zeromean_nonzero',
+              'patchSize': [160, 160, 160], 'patchOffset': [0, 0, 0], 'numClasses': 1, 'thresholds': [0.5], 'activation': 'sigmoid',
+              'activationIncluded': False, 'channelsOrder': 'channels_first', 'backend': 'Torch', 'numberInputs': 1, 'swapInput': False,
+              'biasCorrection': False, 'classes': 'FLAIRChanges'}
+    assert pre == expect, {k: (pre[k], expect[k]) for k in expect if pre[k] != expect[k]}
+    src = os.path.join(folder, str(fold), 'model.onnx')
+    m = onnx.load(src, load_external_data=False)
+    ins = [i for i in m.graph.input if i.name not in {t.name for t in m.graph.initializer}]
+    assert [i.name for i in ins] == ['input'] and [d.dim_value for d in ins[0].type.tensor_type.shape.dim] == [1, 1, 160, 160, 160]
+    assert [d.dim_value for d in m.graph.output[0].type.tensor_type.shape.dim] == [1, 1, 160, 160, 160]
+    w = pack_weights(src, out_dir, q8, small_f32=True)
+    return {
+        'id': 'raidionics-flair', 'addonFormat': 1, 'kind': 'raidionics', 'short': 'Raidionics FLAIR',
+        'name': 'Raidionics FLAIR hyperintensity',
+        'version': 'MRI_FLAIRChanges (t2f), network of fold %d, Raidionics-models v1.3.0-rc' % fold, 'fold': fold,
+        'trainer': 'AGU-Net (attention U-Net), PyTorch; preprocessing and inference as raidionicsseg 1.5.2',
+        'inputChannels': ['FLAIR'], 'tta': False,
+        'raidionics': {**pre, 'overlapRatio': 0.0, 'reconstruction': 'thresholding', 'reconstructionOrder': 'resample_first',
+                       'refinement': 'brain_overlap'},
+        'onnx': 'model.onnx', 'weights': w,
+        'labels': [{'value': 1, 'name': 'FLAIR hyperintensity', 'short': 'FLAIR', 'color': [255, 210, 63]}],
+        'compartments': [{'key': 'flair', 'name': 'FLAIR hyperintensity (tumor and edema)', 'labels': [1]}],
+        'tableNote': 'One class: the whole FLAIR hyperintensity. Enhancing tumor, necrosis and edema are not separated.',
+        'citation': ('Faanes MG, Bouget D, Jakola AS, et al. A unified FLAIR hyperintensity segmentation model for various CNS tumor '
+                     'types and acquisition time points. Sci Rep 2026;16:19707. doi:10.1038/s41598-026-48496-1. '
+                     'Bouget D, et al. Raidionics: an open software for pre- and postoperative central nervous system tumor '
+                     'segmentation and standardized reporting. Sci Rep 2023;13. doi:10.1038/s41598-023-42048-7.'),
+        'license': 'BSD 2-Clause (Copyright (c) 2023, David Bouget)', 'licenseText': RAIDIONICS_LICENSE,
+        'sourceUrl': 'https://github.com/raidionics/Raidionics-models/releases/tag/v1.3.0-rc',
+    }
+
+
 def export_hdbet(folder, out_dir, q8):
     os.environ['nnUNet_compile'] = 'F'
     from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
@@ -249,14 +334,15 @@ def export_hdbet(folder, out_dir, q8):
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
-    ap.add_argument('model', choices=['hdglio', 'hdbet', 'brats2020'])
+    ap.add_argument('model', choices=['hdglio', 'hdbet', 'brats2020', 'raidionics-flair'])
     ap.add_argument('folder')
     ap.add_argument('--q8', action='store_true', help='int8 weights (smaller, slightly less exact)')
     ap.add_argument('--out', default=None)
     a = ap.parse_args()
     out_dir = a.out or os.path.join(OUT, a.model)
     os.makedirs(out_dir, exist_ok=True)
-    cfg = {'hdglio': export_hdglio, 'hdbet': export_hdbet, 'brats2020': export_brats2020}[a.model](a.folder, out_dir, a.q8)
+    cfg = {'hdglio': export_hdglio, 'hdbet': export_hdbet, 'brats2020': export_brats2020,
+           'raidionics-flair': export_raidionics_flair}[a.model](a.folder, out_dir, a.q8)
     json.dump(cfg, open(os.path.join(out_dir, 'config.json'), 'w'), indent=1)
     sz = sum(os.path.getsize(os.path.join(out_dir, f)) for f in os.listdir(out_dir))
     print(a.model, 'exported to', out_dir, '(%.1f MB)' % (sz / 1e6))

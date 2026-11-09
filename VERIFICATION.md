@@ -223,6 +223,61 @@ that computer from then on.
 **Memory.** A run peaks at about 3 GB in the browser process. Two runs at once on the 7 GB test
 machine exceeded its memory limit and one browser tab was stopped by the system.
 
+## 6. Version 1.2.0: Raidionics FLAIR hyperintensity add-on
+
+**Model.** `MRI_FLAIRChanges`, folder `t2f`, network of fold 0, from
+`Raidionics-MRI_FLAIRChanges-v13.zip` (Raidionics-models release v1.3.0-rc; md5
+ec6209b06af8cb226bff50d8890eed24, which matches the release's Slicer model list; the Raidionics
+app's list still carries an older checksum for the same URL). BSD 2-Clause. One input (FLAIR),
+one sigmoid output (FLAIR hyperintensity). `build/export_models.py raidionics-flair` reads the
+model's `pre_processing.ini` and stops unless it is exactly the configuration the JavaScript
+implements (1 mm spacing, `minimum` background crop, clipping at the 0 and 99.5th percentiles,
+`zeromean_nonzero`, 160^3 patches without offset, sigmoid not in the graph, channels first).
+
+**Reference.** raidionicsseg 1.5.2 (`fit.run_model`) with the runtime settings the Raidionics app
+sets through raidionics_rads_lib 1.3.3 (thresholding, `resample_first`, overlapping ratio 0, no
+test-time augmentation, first fold only), followed by raidionics_rads_lib's
+`perform_brain_overlap_refinement`, copied into `test/validate/raidionics_reference.py`. Both
+sides get the same FLAIR file and the same brain mask (the HD-BET mask the workbench exported).
+Raidionics itself would supply the mask from its own brain model; the mask only decides which
+connected regions are kept (those touching the brain), and none was removed in these cases.
+
+**Implementation, original network (Node, `test/unit/raidionics_test.mjs` with
+onnxruntime-node and the original fp32 `model.onnx`).** `test/validate/compare_raidionics.py`
+also compares the intermediate arrays:
+
+| Case | FLAIR grid | Resampled grid (both) | Network input max abs diff | Probability max abs diff | Differing voxels | Volume cm3 |
+|---|---|---|---|---|---|---|
+| TCGA-DU-7294 (axial, 0.94 x 0.94 x 2.5 mm) | 256 x 256 x 68 | 156 x 204 x 156, 2 patches | 4.8e-7 | 1.7e-6 | 0 | 30.270 / 30.270 |
+| TCGA-FG-6692 (oblique, 0.90 x 0.90 x 5.5 mm) | 208 x 256 x 26 | 177 x 237 x 200, 8 patches | 4.8e-7 | 2.9e-6 | 0 | 24.089 / 24.089 |
+
+The resampling reproduces scipy's `affine_transform` arithmetic (coordinates accumulated in
+scipy's order, which was confirmed on 15,635 boundary cases, and its neighbour order and
+weights); the remaining input difference is the mean and standard deviation, which numpy
+computes in float32 and the workbench in float64. The brain overlap rule was compared with the
+copied raidionics_rads_lib function on random blobs (686 components, 1,743 voxels removed):
+identical.
+
+**Weight precision.** With the weights stored as 8-bit integers per channel, 34 voxels changed on
+DU-7294 (Dice 0.9988, 30.309 cm3); with 16-bit weights none changed on either case. The add-on
+ships with 16-bit weights (44 MB).
+
+**Workbench (browser, WebAssembly, shipped add-on file), `test/e2e.mjs` then
+`raidionics_reference.py` and `compare_raidionics.py`:**
+
+| Case | Loaded | Workbench cm3 | raidionicsseg cm3 | Differing voxels | Dice |
+|---|---|---|---|---|---|
+| TCGA-DU-7294 | FLAIR only | 30.274 | 30.270 | 2 of 4,456,448 | 0.99993 |
+| TCGA-FG-6692 | all four, registered to FLAIR | RAIDFG_WB | RAIDFG_REF | RAIDFG_DIFF of 1,384,448 | RAIDFG_DICE |
+
+The two DU-7294 voxels come from ONNX Runtime Web's WebAssembly kernels rounding differently from
+the native CPU build. RAIDWEBGPU
+
+**FLAIR-only runs and the other models.** The run button needs only the sequences the selected
+model uses; others that are chosen are registered to the reference for viewing and exported as
+registered images. With HD-GLIO and the BraTS model all four are still required, and the demo
+case gives the same results as before: RAIDREGRESSION
+
 ## Run time
 
 Demo case on the 2-core test machine, CPU (WebAssembly), no augmentation: 9 min (HD-BET

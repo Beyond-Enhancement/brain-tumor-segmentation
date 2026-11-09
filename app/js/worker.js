@@ -1,11 +1,13 @@
 // Processing worker: input parsing, preprocessing (as in the HD-GLIO README), HD-BET brain
-// extraction, rigid registration, segmentation (HD-GLIO or an add-on model) and NIfTI export. Nothing leaves the
-// computer: the worker only talks to the page and fetches its own bundled files.
+// extraction, rigid registration, segmentation (HD-GLIO or an add-on model: nnU-Net, or Raidionics
+// with its own preprocessing) and NIfTI export. Nothing leaves the computer: the worker only talks
+// to the page and fetches its own bundled files.
 import { readNifti, writeNifti, isGzip } from './lib/nifti.js';
 import * as G from './lib/geom.js';
 import * as DCM from './lib/dicom.js';
 import { registerRigid } from './lib/register.js';
 import { predictCase, labelComponents } from './lib/nnunet.js';
+import { predictRaidionics } from './lib/raidionics.js';
 import { Network, gpuInfo, loadOrt } from './lib/ortrun.js';
 import { unzipSync, gunzipSync } from '../vendor/fflate.mjs';
 
@@ -164,7 +166,14 @@ async function registerAddon(name, u8) {
   const cfg = JSON.parse(new TextDecoder().decode(cj));
   if ((cfg.addonFormat || 0) !== ADDON_FORMAT) throw new Error(name + ': made for a different version of the workbench');
   if (!/^[a-z0-9_-]{2,40}$/.test(cfg.id || '') || cfg.id === 'hdglio' || cfg.id === 'hdbet') throw new Error(name + ': invalid model id');
-  if (![1, 2].includes(cfg.nnunet) || !Array.isArray(cfg.inputChannels) || !cfg.inputChannels.every(c => ROLES.includes(c))) throw new Error(name + ': unsupported model');
+  if (!Array.isArray(cfg.inputChannels) || !cfg.inputChannels.length || !cfg.inputChannels.every(c => ROLES.includes(c))) throw new Error(name + ': unsupported model');
+  if (cfg.kind === 'raidionics') {
+    const P = cfg.raidionics || {};
+    const ok = P.crop === 'minimum' && P.normalization === 'zeromean_nonzero' && P.activation === 'sigmoid' && !P.activationIncluded &&
+      P.channelsOrder === 'channels_first' && P.numClasses === 1 && P.numberInputs === 1 && cfg.inputChannels.length === 1 && !P.swapInput &&
+      P.reconstructionOrder === 'resample_first' && Array.isArray(P.patchSize) && P.patchSize.length === 3 && Array.isArray(P.outputSpacing) && P.outputSpacing.length === 3;
+    if (!ok) throw new Error(name + ': Raidionics configuration not supported by this version of the workbench');
+  } else if (![1, 2].includes(cfg.nnunet)) throw new Error(name + ': unsupported model');
   const onnx = get(cfg.onnx), pack = get(cfg.weights && cfg.weights.pack);
   if (!onnx || !pack) throw new Error(name + ': network files missing');
   const digest = hex(await crypto.subtle.digest('SHA-256', pack));
@@ -197,6 +206,7 @@ async function postModels(added) {
   const list = Object.values(state.models).filter(c => c.id !== 'hdbet' && (c.id === 'hdglio' || c.source)).map(c => ({
     id: c.id, name: c.name, version: c.version, source: c.source || null, license: c.license || null, citation: c.citation || null,
     labels: c.labels, compartments: c.compartments, weights: c.weights.format,
+    inputChannels: c.inputChannels, kind: c.kind || 'nnunet', tta: c.tta !== false, tableNote: c.tableNote || null, short: c.short || null,
   })).sort((a, b) => (a.id === 'hdglio' ? -1 : b.id === 'hdglio' ? 1 : a.name.localeCompare(b.name)));
   post('models', { list, errors: state.addonErrors.splice(0), added: added || null });
 }
@@ -222,20 +232,28 @@ async function run(assignment, opt) {
   const T = { start: now() };
   const log = [];
   const note = s => { log.push(s); };
-  for (const r of ROLES) if (!assignment[r]) throw new Error('Choose a series for ' + r);
-  const ids = ROLES.map(r => assignment[r]);
-  if (new Set(ids).size !== 4) throw new Error('Each sequence must be a different series');
-  const refRole = opt.reference || 'T1';
+  // the model decides which sequences are needed; any others loaded are registered for viewing
+  const modelId = opt.model || 'hdglio';
+  if (modelId !== 'hdglio' && !state.models[modelId]) throw new Error('The selected model is not loaded. Add its model file again.');
+  const gcfg = await loadModelConfig(modelId);
+  const mname = gcfg.short || gcfg.name;
+  const required = gcfg.inputChannels;
+  for (const r of required) if (!assignment[r]) throw new Error(mname + ' needs a series for ' + r);
+  const loaded = ROLES.filter(r => assignment[r]);
+  const ids = loaded.map(r => assignment[r]);
+  if (new Set(ids).size !== ids.length) throw new Error('Each sequence must be a different series');
+  let refRole = opt.reference || 'T1';
+  if (!loaded.includes(refRole)) { note(refRole + ' is not loaded: ' + required[0] + ' is the reference'); refRole = required[0]; }
 
   // 1) volumes, reoriented to standard (fslreorient2std)
   progress('prepare', 0, 'Assembling volumes');
   const raw = {}, plans = {}, reo = {};
-  for (const r of ROLES) {
+  for (const r of loaded) {
     raw[r] = await getVolume(assignment[r]);
     if (raw[r].nt > 1) note(r + ': 4D file, first volume used');
     plans[r] = G.reorientPlan(raw[r]);
     reo[r] = G.applyReorient(raw[r], plans[r]);
-    progress('prepare', (ROLES.indexOf(r) + 1) / 4, 'Reorienting ' + r);
+    progress('prepare', (loaded.indexOf(r) + 1) / loaded.length, 'Reorienting ' + r);
   }
   // reference grid
   let grid = { dims: reo[refRole].dims.slice(), affine: new Float64Array(reo[refRole].affine) };
@@ -260,14 +278,16 @@ async function run(assignment, opt) {
   if (backend === 'webgpu' && state.gpuBroken) { backend = 'wasm'; note('The GPU failed earlier in this session: using the CPU'); }
   else if (backend === 'webgpu' && opt.device === 'auto' && opt.avoidGpu) { backend = 'wasm'; note('The GPU failed on this computer before: Automatic uses the CPU (choose GPU to try it again)'); }
   const ctx = { backend, note, gpuFailed: false, usedGpu: false };
-  const netProgress = (stage, name) => (st, f, e) => progress(stage, st === 'network' ? 0.1 + 0.85 * f : st === 'preprocess' ? 0.1 * f : 0.95,
-    st === 'network' && e ? name + ': patch ' + e.tile + '/' + e.tiles + (e.mirrors > 1 ? ', mirror ' + e.mirror + '/' + e.mirrors : '') + (ctx.backend === 'webgpu' ? ' (GPU)' : '') : name + ' preprocessing');
+  const netProgress = (stage, name) => (st, f, e) => progress(stage, st === 'network' ? 0.1 + 0.85 * f : st === 'preprocess' ? 0.1 * f : 0.95 + 0.05 * (f || 0),
+    st === 'network' && e ? name + ': patch ' + e.tile + '/' + e.tiles + (e.mirrors > 1 ? ', mirror ' + e.mirror + '/' + e.mirrors : '') + (ctx.backend === 'webgpu' ? ' (GPU)' : '')
+      : st === 'post' ? name + ': back to the reference grid' : name + ' preprocessing');
 
   // 2) brain extraction (HD-BET) on the reference
   let brain;
   if (opt.skullStrip) {
     progress('hdbet', 0, 'HD-BET brain extraction on ' + refRole);
-    const { res: r } = await runNetwork('hdbet', 'HD-BET', 'hdbet', [refOnGrid.data], npShape(grid.dims), npSpacing(grid.affine), !!opt.ttaBet, ctx, netProgress('hdbet', 'HD-BET'));
+    const betProgress = netProgress('hdbet', 'HD-BET');
+    const { res: r } = await runNetwork('hdbet', 'HD-BET', 'hdbet', ctx, net => predictCase([refOnGrid.data], npShape(grid.dims), npSpacing(grid.affine), net.cfg, (p, d) => net.run(p, d), { tta: !!opt.ttaBet, shouldStop: cancelled, onProgress: betProgress }));
     brain = new Uint8Array(r.seg.length);
     for (let i = 0; i < brain.length; i++) brain[i] = r.seg[i] === 1 ? 1 : 0;
     if (opt.lcc !== false) brain = largestComponent(brain, grid.dims);
@@ -283,7 +303,7 @@ async function run(assignment, opt) {
   const regMask = dilateBox(brain, grid.dims, grid.affine, 6);
   const reg = {}, onRef = {};
   onRef[refRole] = refOnGrid.data;
-  const others = ROLES.filter(r => r !== refRole);
+  const others = loaded.filter(r => r !== refRole);
   for (let oi = 0; oi < others.length; oi++) {
     const r = others[oi];
     if (cancelled()) throw new Error('Cancelled');
@@ -301,19 +321,25 @@ async function run(assignment, opt) {
   }
   T.register = now();
 
-  // 4) mask all sequences with the reference brain mask (fslmaths -mas)
-  const masked = {};
-  for (const r of ROLES) { const d = new Float32Array(onRef[r]); for (let i = 0; i < d.length; i++) if (!brain[i]) d[i] = 0; masked[r] = d; }
+  // 4) model inputs. nnU-Net models (HD-GLIO and add-ons): all sequences masked with the
+  // reference brain mask (fslmaths -mas). Raidionics: the image as it is (the model crops the
+  // head itself); the brain mask is used afterwards to drop findings outside the brain.
+  const raid = gcfg.kind === 'raidionics';
+  const inputs = {};
+  for (const r of required) {
+    if (raid) { inputs[r] = onRef[r]; continue; }
+    const d = new Float32Array(onRef[r]); for (let i = 0; i < d.length; i++) if (!brain[i]) d[i] = 0; inputs[r] = d;
+  }
 
   // 5) tumor segmentation (HD-GLIO, or an add-on model)
-  const modelId = opt.model || 'hdglio';
-  if (modelId !== 'hdglio' && !state.models[modelId]) throw new Error('The selected model is not loaded. Add its model file again.');
-  const gcfg = await loadModelConfig(modelId);
-  const mname = gcfg.short || gcfg.name;
   progress('hdglio', 0, 'Loading ' + mname);
-  const chans = gcfg.inputChannels.map(r => masked[r]);
-  const { res } = await runNetwork(modelId, mname, 'hdglio', chans, npShape(grid.dims), npSpacing(grid.affine), !!opt.tta, ctx, netProgress('hdglio', mname));
+  const segProgress = netProgress('hdglio', mname);
+  let segInfo = null;
+  const { res } = await runNetwork(modelId, mname, 'hdglio', ctx, raid
+    ? net => predictRaidionics({ dims: grid.dims, affine: grid.affine, data: inputs[required[0]] }, opt.skullStrip ? brain : null, net.cfg, (p, d) => net.run(p, d), { shouldStop: cancelled, onProgress: segProgress })
+    : net => predictCase(required.map(r => inputs[r]), npShape(grid.dims), npSpacing(grid.affine), net.cfg, (p, d) => net.run(p, d), { tta: !!opt.tta, shouldStop: cancelled, onProgress: segProgress }));
   const seg = res.seg;
+  if (raid) { segInfo = res.info; if (res.info.removedOutsideBrain) note('Raidionics: ' + (res.info.removedOutsideBrain * G.voxelVolume(grid.affine) / 1000).toFixed(2) + ' cm3 outside the brain mask removed (brain overlap refinement)'); }
   backend = ctx.backend;
   T.hdglio = now();
 
@@ -333,20 +359,21 @@ async function run(assignment, opt) {
     if (cnt) { const A = grid.affine, i = si / cnt, j = sj / cnt, k = sk / cnt; tumorCenterMM = [0, 1, 2].map(r => A[4 * r] * i + A[4 * r + 1] * j + A[4 * r + 2] * k + A[4 * r + 3]); }
   }
 
-  state.result = { grid, gridIsNativeRef, refRole, plan: plans[refRole], rawRef: raw[refRole], onRef, masked, brain, seg, cfg: gcfg };
+  state.result = { grid, gridIsNativeRef, refRole, plan: plans[refRole], rawRef: raw[refRole], onRef, inputs, brain, seg, cfg: gcfg };
   const timing = { prepare: T.prepare - T.start, hdbet: T.hdbet - T.prepare, register: T.register - T.hdbet, hdglio: T.hdglio - T.register, total: T.hdglio - T.start };
 
   // 7) send display volumes (uncompressed NIfTI) to the page
   const vols = {};
   const transfer = [];
-  for (const r of ROLES) { const b = writeNifti({ dims: grid.dims, affine: grid.affine, data: onRef[r] }, { dtype: 'f32', gz: false }); vols[r] = b.buffer; transfer.push(b.buffer); }
+  for (const r of loaded) { const b = writeNifti({ dims: grid.dims, affine: grid.affine, data: onRef[r] }, { dtype: 'f32', gz: false }); vols[r] = b.buffer; transfer.push(b.buffer); }
   const bm = writeNifti({ dims: grid.dims, affine: grid.affine, data: brain }, { dtype: 'u8', gz: false });
   const sg = writeNifti({ dims: grid.dims, affine: grid.affine, data: seg }, { dtype: 'u8', gz: false });
   vols.brain = bm.buffer; vols.seg = sg.buffer; transfer.push(bm.buffer, sg.buffer);
   post('result', {
-    vols, comps, brainCm3, tumorCenterMM, voxelVolume: vv, voxelSize: G.spacing(grid.affine), dims: grid.dims, reg, refRole,
-    backend, gpu, gpuFailed: ctx.gpuFailed, usedGpu: ctx.usedGpu && !ctx.gpuFailed, timing, notes: log, tta: !!opt.tta, labels: gcfg.labels, compartments: gcfg.compartments,
-    model: { id: gcfg.id, name: gcfg.name, version: gcfg.version, weights: gcfg.weights.format, source: gcfg.source || null, citation: gcfg.citation || null, license: gcfg.license || null }, bet: opt.skullStrip ? (await loadModelConfig('hdbet')).version : null,
+    vols, comps, brainCm3, tumorCenterMM, voxelVolume: vv, voxelSize: G.spacing(grid.affine), dims: grid.dims, reg, refRole, roles: loaded, inputs: required,
+    backend, gpu, gpuFailed: ctx.gpuFailed, usedGpu: ctx.usedGpu && !ctx.gpuFailed, timing, notes: log, tta: !!opt.tta && !raid, labels: gcfg.labels, compartments: gcfg.compartments,
+    model: { id: gcfg.id, name: gcfg.name, version: gcfg.version, weights: gcfg.weights.format, source: gcfg.source || null, citation: gcfg.citation || null, license: gcfg.license || null, kind: gcfg.kind || 'nnunet', tableNote: gcfg.tableNote || null },
+    segInfo, bet: opt.skullStrip ? (await loadModelConfig('hdbet')).version : null,
   }, transfer);
 }
 
@@ -355,12 +382,12 @@ async function run(assignment, opt) {
 // the CPU; the rest of the session stays on the CPU.
 const isGpuFailure = e => /device.*lost|is lost|mapAsync|GPUBuffer|GPUDevice|webgpu|WGPU|out of memory|OrtRun/i.test(String((e && e.message) || e));
 
-async function runNetwork(name, label, stage, channels, shape, spacing, tta, ctx, onProgress) {
+async function runNetwork(name, label, stage, ctx, predict) {
   for (;;) {
     const net = await getNetworkSafe(name, ctx.backend, ctx.note);
     ctx.backend = net.backend;
     try {
-      const res = await predictCase(channels, shape, spacing, net.cfg, (p, d) => net.run(p, d), { tta, shouldStop: cancelled, onProgress });
+      const res = await predict(net);
       if (net.backend === 'webgpu') ctx.usedGpu = true;
       return { cfg: net.cfg, res };
     } catch (e) {
@@ -410,7 +437,12 @@ function doExport(what, reqId) {
   else if (what === 'brain') { vol = toOutputGrid(R.brain, Uint8Array); dtype = 'u8'; name = 'hdbet_brain_mask.nii.gz'; descrip = 'HD-BET brain mask'; }
   else if (what.startsWith('input:')) {
     const r = what.slice(6);
-    vol = toOutputGrid(R.masked[r], Float32Array); name = prefix + '_input_' + r.toLowerCase() + '.nii.gz'; descrip = r + ' registered, brain-extracted';
+    if (R.inputs[r]) {
+      vol = toOutputGrid(R.inputs[r], Float32Array); name = prefix + '_input_' + r.toLowerCase() + '.nii.gz';
+      descrip = R.cfg.kind === 'raidionics' ? r + ' as given to Raidionics' : r + ' registered, brain-extracted';
+    } else if (R.onRef[r]) {
+      vol = toOutputGrid(R.onRef[r], Float32Array); name = 'registered_' + r.toLowerCase() + '.nii.gz'; descrip = r + ' registered to ' + R.refRole;
+    } else throw new Error(r + ' was not loaded');
   } else if (what.startsWith('reg:')) {
     const r = what.slice(4);
     vol = toOutputGrid(R.onRef[r], Float32Array); name = 'registered_' + r.toLowerCase() + '.nii.gz'; descrip = r + ' registered to ' + R.refRole;

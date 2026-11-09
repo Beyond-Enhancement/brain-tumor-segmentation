@@ -1,13 +1,14 @@
 # Brain Tumor Segmentation Workbench
 
 A standalone, offline tool for automated brain tumor segmentation with **HD-GLIO**
-(Kickingereder, Isensee et al., Lancet Oncol 2019) or, as an add-on, the **nnU-Net BraTS 2020**
-model (Isensee et al.), which also separates necrosis. Drop in a DICOM folder, a `.zip` or NIfTI
-files. It finds the T1, T1c, T2 and FLAIR series, prepares them as the HD-GLIO instructions
-prescribe (reorientation, HD-BET brain extraction, rigid registration to a reference sequence,
-masking), runs the chosen model and shows the result on a 3-plane viewer with the compartment
-volumes in cm3. The segmentation and the prepared inputs are saved as NIfTI. All processing
-happens on the computer it runs on.
+(Kickingereder, Isensee et al., Lancet Oncol 2019) or one of two add-on models: the **nnU-Net
+BraTS 2020** model (Isensee et al.), which also separates necrosis, and the **Raidionics FLAIR
+hyperintensity** model (Faanes, Bouget et al., Sci Rep 2026), which needs only a FLAIR and suits
+non-enhancing gliomas. Drop in a DICOM folder, a `.zip` or NIfTI files. It finds the T1, T1c, T2
+and FLAIR series, prepares them as the HD-GLIO instructions prescribe (reorientation, HD-BET brain
+extraction, rigid registration to a reference sequence, masking), runs the chosen model and shows
+the result on a 3-plane viewer with the compartment volumes in cm3. The segmentation and the
+prepared inputs are saved as NIfTI. All processing happens on the computer it runs on.
 
 ![Workbench (v1.1.1) running the TCGA-FG-6692 demo with HD-GLIO](docs/workbench.png)
 
@@ -30,6 +31,15 @@ convention:
 | 1 + 4 | Tumor core (TC) |
 | 1 + 2 + 4 | Whole tumor (WT) |
 
+The **Raidionics FLAIR hyperintensity** add-on has one label:
+
+| Label | Compartment |
+|---|---|
+| 1 | FLAIR hyperintensity (tumor and edema, not separated) |
+
+For a non-enhancing glioma this is the tumor extent on FLAIR; around an enhancing tumor it also
+includes edema.
+
 The volumes table lists each compartment in cm3, counted on the grid of the reference sequence,
 plus the HD-BET brain volume. **Copy table** and **Save CSV** export it. The CSV carries the model,
 grid and options used, and no patient information.
@@ -45,12 +55,13 @@ admin rights are needed.
 | [`BrainTumorSegmentationWorkbench-macOS-AppleSilicon.zip`](downloads/BrainTumorSegmentationWorkbench-macOS-AppleSilicon.zip) | macOS 11+, Apple M-series | 67 MB |
 | [`BrainTumorSegmentationWorkbench-macOS-Intel.zip`](downloads/BrainTumorSegmentationWorkbench-macOS-Intel.zip) | macOS 11+, Intel | 67 MB |
 | [`BrainTumorSegmentationWorkbench-model-BraTS2020-nnUNet.btsmodel`](downloads/BrainTumorSegmentationWorkbench-model-BraTS2020-nnUNet.btsmodel) | Optional add-on model for any of the above | 58 MB |
+| [`BrainTumorSegmentationWorkbench-model-Raidionics-FLAIR.btsmodel`](downloads/BrainTumorSegmentationWorkbench-model-Raidionics-FLAIR.btsmodel) | Optional add-on model for any of the above | 44 MB |
 
-**Add-on model.** To use the nnU-Net BraTS 2020 model, download the `.btsmodel` file and put it
-in the same folder as the program (for example both in Downloads). It then appears under
-*Processing options > Segmentation model*. Alternatively open it with **Add model file** (for
-that session only). It is a separate file because the program and both models together would
-exceed GitHub's 100 MB file limit. The file is checked (format and checksum) before use.
+**Add-on models.** To use an add-on model, download its `.btsmodel` file and put it in the same
+folder as the program (for example both in Downloads). It then appears under *Processing
+options > Segmentation model*. Alternatively open it with **Add model file** (for that session
+only). The add-ons are separate files because the program and the models together would exceed
+GitHub's 100 MB file limit. Each file is checked (format and checksum) before use.
 
 Each file contains everything: the page, the viewer, ONNX Runtime and both networks.
 
@@ -72,16 +83,19 @@ until IT approves them.
 
 ## Using it
 
-1. **Load a study.** Drop a DICOM folder or `.zip`, or four NIfTI files, or pick the demo case.
+1. **Load a study.** Drop a DICOM folder or `.zip`, or NIfTI files, or pick the demo case. HD-GLIO
+   and the BraTS model need all four sequences; the Raidionics FLAIR model needs only the FLAIR.
    DICOM may be uncompressed, RLE, JPEG lossless, JPEG-LS or JPEG 2000, single- or multi-frame
    (enhanced MR). Series with fewer than 3 slices are skipped; localisers, diffusion, perfusion
    and other series are listed but not assigned automatically.
 2. **Check the sequences.** T1, T1c, T2 and FLAIR are guessed from the series descriptions and
    headers (TR, TE, TI, contrast agent) or the NIfTI file names. When three are recognised and
    exactly one series is left over, it takes the remaining slot and is marked *by elimination -
-   check it*. Change any of them in the drop-downs.
+   check it*. Change any of them in the drop-downs. With the Raidionics model, T1, T1c and T2 are
+   optional: any that are chosen are registered to the reference and can be shown as background.
 3. **Options.**
-   - *Segmentation model*: HD-GLIO (built in) or an add-on model such as nnU-Net BraTS 2020.
+   - *Segmentation model*: HD-GLIO (built in) or an add-on model (nnU-Net BraTS 2020, Raidionics
+     FLAIR hyperintensity).
    - *Register to*: the reference sequence. T1, as HD-GLIO was published, or T1c or FLAIR, for
      example when that sequence has the thinnest slices. HD-BET runs on the reference, the other
      three are registered to it, and the volumes and exports are on its grid. The brain-mask
@@ -94,20 +108,25 @@ until IT approves them.
    - The reference, grid and model choices are remembered in this browser.
    - *Test-time augmentation*: the published HD-GLIO averages 8 mirrored predictions. It is off by
      default because it takes about 8 times longer; switch it on to reproduce the published
-     setting exactly.
+     setting exactly. Raidionics does not use it, so it is unavailable with that model.
+   - With the Raidionics model, register to FLAIR with the grid as acquired to run it exactly as
+     Raidionics does (the page says so when another choice is made).
    - *Compute*: automatic uses the GPU through WebGPU when there is one, otherwise the CPU. If
      the GPU stops responding during a run, that step restarts on the CPU and the run finishes
      there (see Troubleshooting).
 4. **Run segmentation.** Progress is shown per step. On the CPU of a 2-core test machine the
    demo case took 9 minutes (HD-BET 5.4 min, registration 0.7 min, HD-GLIO 2.9 min), or 32
-   minutes with test-time augmentation. More CPU cores, or a GPU through WebGPU, make it
-   considerably faster.
+   minutes with test-time augmentation. The Raidionics model on the FLAIR of TCGA-DU-7294 alone
+   took 7.5 minutes (HD-BET 6.8 min, Raidionics 0.7 min). More CPU cores, or a GPU through
+   WebGPU, make it considerably faster.
 5. **Review.** Axial, coronal, sagittal (anterior to the left) or 3-plane view. Choose the
    background sequence, the overlay opacity, crosshairs on or off, and which compartments are
    shown (click a colour swatch). The *Registration
    check* lists each sequence's rotation and shift and flags large ones. Switch the background
    to each registered sequence to confirm the alignment.
-6. **Export.** Segmentation, brain mask and the four prepared inputs as `.nii.gz`. Files are on
+6. **Export.** Segmentation, brain mask and the prepared inputs as `.nii.gz` (with Raidionics:
+   the FLAIR as given to the model, which is not brain-extracted, and the other sequences as
+   registered). Files are on
    the reference grid with the same voxel order and orientation as the reference series that was
    loaded, so they overlay it in any viewer.
 
@@ -139,11 +158,13 @@ reference; details in [VERIFICATION.md](VERIFICATION.md)): HD-GLIO differs at 18
 voxels (Dice 0.9989 enhancing, 0.9971 non-enhancing; volumes within 0.08 cm3). With test-time
 augmentation on both sides, 22 voxels differ (Dice 0.9991 / 0.9965). The HD-BET mask differs at
 184 boundary voxels (Dice 0.99975). The nnU-Net BraTS 2020 add-on differs from the original
-PyTorch network at 1 voxel (Dice 1.0 for ET, NCR and TC; 0.99991 for ED).
+PyTorch network at 1 voxel (Dice 1.0 for ET, NCR and TC; 0.99991 for ED). The Raidionics FLAIR
+add-on, against the original raidionicsseg code on the same FLAIR and brain mask, differs at
+2 voxels on TCGA-DU-7294 (Dice 0.99993; 30.27 cm3 on both sides) and RAIDFG on TCGA-FG-6692.
 
 **Weight precision.** HD-GLIO and HD-BET are stored as 8-bit integers per output channel and
 restored to 32-bit floating point at load, which keeps the executable under GitHub's 100 MB file
-limit. The add-on model is stored at 16-bit precision. The agreement figures above are for the
+limit. The add-on models are stored at 16-bit precision. The agreement figures above are for the
 shipped files.
 
 **About the BraTS model.** It is one network (fold 0) of the region-based configuration
@@ -151,6 +172,25 @@ shipped files.
 challenge as an ensemble of 25 such networks; a single network is expected to score slightly
 lower than that ensemble. BraTS training images were registered to the SRI24 atlas; the
 workbench runs the model in native space, on the same prepared inputs as HD-GLIO.
+
+**About the Raidionics model.** It is `MRI_FLAIRChanges` (`t2f`) from the Raidionics-models
+release v1.3.0-rc, the model that the Raidionics software (SINTEF Digital, Norway) uses
+for non-contrast-enhancing tumors, described as a unified FLAIR hyperintensity model for
+glioblastoma, lower-grade glioma, meningioma and metastasis, before and after surgery, trained on
+about 5,000 FLAIR scans from many centers (Faanes et al., Sci Rep 2026). The paper reports a mean
+Dice of 84.5% for preoperative lower-grade gliomas. The workbench runs the network of fold 0, as
+the Raidionics software does by default. It does not use the HD-GLIO preparation: it takes the
+FLAIR as it is (no skull stripping), and `app/js/lib/raidionics.js` repeats raidionicsseg's own
+steps:
+
+| Step | raidionicsseg 1.5.2 / raidionics_rads_lib 1.3.3 | Workbench |
+|---|---|---|
+| Head crop | Bounding box of voxels >= 20% of the intensity range | Same |
+| Resampling | `nibabel.processing.resample_to_output`, 1 mm, linear | Same arithmetic as scipy's `affine_transform` |
+| Intensities | Negatives to 0, clipping at the 0 and 99.5th percentiles, z-score of the nonzero voxels | Same |
+| Inference | 160^3 patches without overlap (the last one moved inside), maximum where they meet, sigmoid | Same |
+| Back to the FLAIR grid | Linear resampling of the probabilities, threshold 0.5 | Same |
+| Refinement | Keep connected regions that touch the brain mask (Raidionics' own brain model) | Same rule, with the HD-BET mask |
 
 The networks run with [ONNX Runtime Web](https://onnxruntime.ai): WebGPU when available,
 otherwise multi-threaded WebAssembly on the CPU.
@@ -181,13 +221,15 @@ chromeless Edge or Chrome window, and exits shortly after the last window closes
 ## Building
 
 Requires Go 1.22+ and Python 3 with PyTorch, nnU-Net v1 (`nnunet`), nnU-Net v2 (`nnunetv2`),
-`onnx` and Pillow.
+`onnx` and Pillow. The Raidionics parameters are `Raidionics-MRI_FLAIRChanges-v13.zip` from the
+Raidionics-models release v1.3.0-rc.
 
 ```bash
 # 1. trained parameters (from Zenodo, see THIRD_PARTY_NOTICES.md), unzipped
 build/export_models.py hdglio weights_src/hd_glio_params --q8
 build/export_models.py hdbet  weights_src/hdbet_params   --q8
 build/export_models.py brats2020 weights_src/brats2020/<...>/nnUNetTrainerV2BraTSRegions_DA4_BN_BD__nnUNetPlansv2.1_bs5 --out addons/brats2020   # optional add-on
+build/export_models.py raidionics-flair weights_src/raidionics_flairchanges/MRI_FLAIRChanges/t2f --out addons/raidionics-flair     # optional add-on
 # 2. executables
 build/build.sh        # -> dist/BrainTumorSegmentationWorkbench.exe, dist/*-macOS-*.zip, dist/*.btsmodel, dist/btsw-linux-amd64
 ```
@@ -205,6 +247,10 @@ node test/e2e.mjs http://127.0.0.1:8771/ test/out/e2e   # end-to-end in headless
 python3 test/validate/compare_hdglio.py weights_src/hd_glio_params test/out/e2e   # vs PyTorch HD-GLIO
 node test/e2e.mjs http://127.0.0.1:8771/ test/out/e2e-brats --model brats2020   # add-on (serve.py ... --addons DIR)
 python3 test/validate/compare_brats.py <BraTS 2020 model folder> test/out/e2e-brats   # vs PyTorch nnU-Net
+node test/e2e.mjs http://127.0.0.1:8771/ test/out/e2e-raid --files FLAIR.nii.gz --model raidionics-flair --ref FLAIR
+python3 test/validate/raidionics_reference.py FLAIR.nii.gz test/out/e2e-raid/hdbet_brain_mask.nii.gz <t2f folder> test/out/e2e-raid/ref   # raidionicsseg
+python3 test/validate/compare_raidionics.py test/out/e2e-raid/ref test/out/e2e-raid/raidionics-flair_segmentation.nii.gz
+node test/unit/raidionics_test.mjs FLAIR.nii.gz mask.nii.gz addons/raidionics-flair test/out/raid-js --onnx <t2f>/0/model.onnx   # same, in Node, with intermediate arrays
 node test/gpu_loss_test.mjs http://127.0.0.1:47821/ test/out/gpu-loss   # GPU reset mid-run -> CPU fallback
 node test/unit/roles_test.mjs                       # sequence assignment from file names
 ```

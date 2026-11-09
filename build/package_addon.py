@@ -11,6 +11,10 @@ notice = (f"{cfg['name']} - add-on model for the Brain Tumor Segmentation Workbe
           f"Please cite: {cfg.get('citation', '')}\n\n"
           "Place this file in the same folder as the workbench program; it then appears under\n"
           "Processing options > Segmentation model. Or open it with 'Add model file'.\n")
+if cfg.get('sourceUrl'):
+    notice += f"\nSource of the network parameters: {cfg['sourceUrl']}\n"
+if cfg.get('licenseText'):
+    notice += "\nThe network parameters are redistributed under this license:\n\n" + cfg['licenseText']
 files = [('config.json', open(os.path.join(src, 'config.json'), 'rb').read()), ('README.txt', notice.encode('ascii', 'replace')),
          (cfg['onnx'], open(os.path.join(src, cfg['onnx']), 'rb').read()), (cfg['weights']['pack'], open(os.path.join(src, cfg['weights']['pack']), 'rb').read())]
 with zipfile.ZipFile(out, 'w') as z:

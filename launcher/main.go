@@ -32,7 +32,7 @@ var siteFS embed.FS
 
 const (
 	appName   = "Brain Tumor Segmentation Workbench"
-	appVer    = "1.1.1"
+	appVer    = "1.2.0"
 	pingPath  = "/__bts/ping"
 	eventPath = "/__bts/events"
 	addonPath = "/__bts/addons" // add-on model files (*.btsmodel) found next to the executable

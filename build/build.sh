@@ -9,7 +9,7 @@
 # The models must have been exported first (build/export_models.py).
 set -euo pipefail
 cd "$(dirname "$0")/.."
-VERSION="1.1.1"  # keep in sync with appVer in launcher/main.go
+VERSION="1.2.0"  # keep in sync with appVer in launcher/main.go
 NAME="Brain Tumor Segmentation Workbench"
 
 python3 build/prepare_site.py
@@ -39,6 +39,10 @@ ADDONS=()
 if [ -f addons/brats2020/config.json ]; then
   python3 build/package_addon.py addons/brats2020 dist/BrainTumorSegmentationWorkbench-model-BraTS2020-nnUNet.btsmodel
   ADDONS+=(BrainTumorSegmentationWorkbench-model-BraTS2020-nnUNet.btsmodel)
+fi
+if [ -f addons/raidionics-flair/config.json ]; then
+  python3 build/package_addon.py addons/raidionics-flair dist/BrainTumorSegmentationWorkbench-model-Raidionics-FLAIR.btsmodel
+  ADDONS+=(BrainTumorSegmentationWorkbench-model-Raidionics-FLAIR.btsmodel)
 fi
 ( cd dist && sha256sum BrainTumorSegmentationWorkbench.exe BrainTumorSegmentationWorkbench-macOS-*.zip "${ADDONS[@]}" btsw-linux-amd64 > SHA256SUMS.txt && cat SHA256SUMS.txt )
 ls -la dist

@@ -6,7 +6,7 @@ const ROLE_NAMES = { T1: 'T1 pre-contrast', T1c: 'T1 post-contrast', T2: 'T2', F
 const STEPS = [
   { key: 'prepare', name: 'Prepare and reorient' },
   { key: 'hdbet', name: 'Brain extraction (HD-BET)' },
-  { key: 'register', name: 'Registration', dynamic: () => 'Registration to ' + (ui.runRef || refSeq()) },
+  { key: 'register', name: 'Registration', dynamic: () => 'Registration to ' + (ui.runRef || effectiveRef()) },
   { key: 'hdglio', name: 'Tumor segmentation', dynamic: () => 'Tumor segmentation (' + (ui.runModelName || modelName()) + ')' },
 ];
 const COLORS = { 1: [255, 210, 63], 2: [255, 77, 77], 3: [80, 160, 255], 4: [120, 230, 140] };
@@ -124,12 +124,20 @@ function seriesMeta(s) {
   return [dm, sp, ...extra].filter(Boolean).join('  ');
 }
 
+const curModel = () => ui.models.find(x => x.id === $('#optModel').value) || ui.models[0] || {};
+const requiredRoles = () => { const md = curModel(); return md.inputChannels && md.inputChannels.length ? md.inputChannels : ROLES; };
+const loadedRoles = () => ROLES.filter(r => ui.assignment[r]);
+
 function renderRoles() {
   const box = $('#roles');
   box.innerHTML = '';
+  const req = requiredRoles();
+  const md = curModel();
+  $('#rolesHint').textContent = (req.length === 4 ? (md.short || md.name || 'HD-GLIO') + ' needs all four.'
+    : (md.short || md.name) + ' needs only ' + req.join(' and ') + '; the others are optional and, if chosen, are registered for viewing.') + ' Guessed from the series names and headers; check them.';
   for (const r of ROLES) {
     const row = document.createElement('div');
-    row.className = 'role';
+    row.className = 'role' + (req.includes(r) ? '' : ' optional');
     const sel = document.createElement('select');
     sel.innerHTML = '<option value="">- choose -</option>' + ui.series.map(s => `<option value="${esc(s.id)}">${esc(s.label)}</option>`).join('');
     sel.value = ui.assignment[r] || '';
@@ -142,18 +150,20 @@ function renderRoles() {
     meta.textContent = (byElim ? 'by elimination - check it.  ' : '') + seriesMeta(s);
     if (byElim) meta.classList.add('elim');
     meta.title = byElim ? 'The other three sequences were recognised and this was the only series left, so it was assigned here.' : meta.textContent;
-    row.innerHTML = `<span class="tag" title="${ROLE_NAMES[r]}">${r}</span>`;
+    row.innerHTML = `<span class="tag" title="${ROLE_NAMES[r]}${req.includes(r) ? '' : ' (optional for this model)'}">${r}</span>`;
     row.appendChild(sel); row.appendChild(meta);
     box.appendChild(row);
   }
-  const ok = ROLES.every(r => ui.assignment[r]) && new Set(ROLES.map(r => ui.assignment[r])).size === 4;
+  const ids = loadedRoles().map(r => ui.assignment[r]);
+  const ok = req.every(r => ui.assignment[r]) && new Set(ids).size === ids.length;
   $('#runBtn').disabled = !ok || ui.running;
   // pre-processed inputs on one grid: default to skipping registration and brain extraction
-  const chosen = ROLES.map(r => ui.series.find(x => x.id === ui.assignment[r])).filter(Boolean);
-  if (chosen.length === 4 && chosen.every(s => s.kind === 'nifti') && ui.demo == null) {
+  const chosen = loadedRoles().map(r => ui.series.find(x => x.id === ui.assignment[r])).filter(Boolean);
+  if (chosen.length > 1 && chosen.every(s => s.kind === 'nifti') && ui.demo == null) {
     const same = chosen.every(s => s.dims.join() === chosen[0].dims.join() && s.spacing.join() === chosen[0].spacing.join());
-    if (same && !ui.autoSet) { $('#optReg').checked = false; ui.autoSet = true; toast('All four images share one grid: registration switched off. Switch it back on if they are not co-registered.'); }
+    if (same && !ui.autoSet) { $('#optReg').checked = false; ui.autoSet = true; toast('All ' + (chosen.length === 4 ? 'four' : chosen.length) + ' images share one grid: registration switched off. Switch it back on if they are not co-registered.'); }
   }
+  updateRefLabels();
 }
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -172,7 +182,11 @@ function onModels(m) {
   if (m.added && !m.errors.length) toast('Model added: ' + modelName() + '.');
 }
 function updateModelNote() {
-  const md = ui.models.find(x => x.id === $('#optModel').value) || {};
+  const md = curModel();
+  const tta = $('#optTta');
+  tta.disabled = md.tta === false;
+  $('#ttaNote').textContent = md.tta === false ? ' (not used by this model, as in its original software)' : '';
+  renderRoles();
   const comps = (md.compartments || []).map(c => (c.name.match(/\(([^)]*)\)\s*$/) || [])[1] || c.name).filter(Boolean);
   $('#modelNote').textContent = md.id === 'hdglio' || !md.id
     ? 'HD-GLIO (Kickingereder et al. 2019): contrast-enhancing tumor and non-enhancing T2/FLAIR abnormality; no necrosis class.'
@@ -191,14 +205,28 @@ $('#modelInput').onchange = async e => {
 
 // reference sequence and grid: remembered in this browser
 const refSeq = () => $('#optRefSeq').value;
+// the reference actually used: the chosen one if it is loaded (or needed), else the model's first input
+function effectiveRef() {
+  const ref = refSeq(), req = requiredRoles();
+  if (req.length === 4 || ui.assignment[ref] || !ui.series.length) return ref;
+  return req[0];
+}
 function updateRefLabels() {
-  const ref = refSeq();
-  const others = ROLES.filter(r => r !== ref);
+  const ref = effectiveRef(), chosen = refSeq();
+  const req = requiredRoles(), md = curModel();
+  const others = req.length === 4 ? ROLES.filter(r => r !== ref) : loadedRoles().filter(r => r !== ref);
   $('#betLabel').textContent = 'Brain extraction with HD-BET on ' + ref + '.';
-  $('#regLabel').textContent = 'Rigid registration of ' + others.slice(0, 2).join(', ') + ' and ' + others[2] + ' to ' + ref + '.';
-  $('#refNote').textContent = ref === 'T1'
+  $('#regLabel').textContent = others.length === 3 ? 'Rigid registration of ' + others.slice(0, 2).join(', ') + ' and ' + others[2] + ' to ' + ref + '.'
+    : others.length ? 'Rigid registration of ' + others.join(' and ') + ' to ' + ref + '.' : 'Rigid registration of the other sequences, if any, to ' + ref + '.';
+  let note;
+  if (md.kind === 'raidionics') {
+    note = (ref !== chosen ? chosen + ' is not loaded, so ' + ref + ' is the reference. ' : '') +
+      (ref === req[0] && $('#optGrid').value === 'native' ? 'Raidionics runs on the ' + ref + ' as acquired, as in its own software. The HD-BET mask only removes findings outside the brain.'
+        : 'Raidionics was validated on the ' + req[0] + ' as acquired: register to ' + req[0] + ' with the grid as acquired to match it.');
+  } else note = ref === 'T1'
     ? 'HD-GLIO was published with everything registered to T1.'
     : 'Brain mask, registration and outputs on the ' + ref + ' grid. HD-GLIO was published with T1 as the reference; registering to a thinner-slice ' + ref + ' keeps more detail.';
+  $('#refNote').textContent = note;
   if (!ui.running && document.querySelector('#steps li')) renderSteps(null);
 }
 for (const [id, key] of [['#optRefSeq', 'btsw.refSeq'], ['#optGrid', 'btsw.grid']]) {
@@ -258,12 +286,13 @@ $('#runBtn').onclick = () => {
   if (cancelFlag) Atomics.store(cancelFlag, 0, 0);
   for (const k of Object.keys(stepState)) delete stepState[k];
   if (!$('#optBet').checked) stepState.hdbet = { skip: true };
+  if (loadedRoles().length < 2) stepState.register = { skip: true };
   curStep = 'prepare'; stepStart = runStart = performance.now();
   renderSteps('prepare');
   $('#runBtn').disabled = true; $('#cancelBtn').hidden = !cancelFlag;
   const options = {
-    model: (ui.runModelName = modelName(), $('#optModel').value), reference: (ui.runRef = refSeq()), isotropic: $('#optGrid').value === 'iso', skullStrip: $('#optBet').checked, register: $('#optReg').checked,
-    tta: $('#optTta').checked, device: $('#optDevice').value, avoidGpu: gpuFailedBefore(),
+    model: (ui.runModelName = modelName(), $('#optModel').value), reference: (ui.runRef = effectiveRef()), isotropic: $('#optGrid').value === 'iso', skullStrip: $('#optBet').checked, register: $('#optReg').checked,
+    tta: $('#optTta').checked && !$('#optTta').disabled, device: $('#optDevice').value, avoidGpu: gpuFailedBefore(),
   };
   worker.postMessage({ type: 'run', assignment: { ...ui.assignment }, options });
 };
@@ -356,7 +385,7 @@ async function showVolumes() {
   if (!ui.result) return;
   if (viewerLost) { await rebuildViewer(); return; }
   await nvReady;
-  const bg = images[$('#bgSel').value] || images.T1c;
+  const bg = images[$('#bgSel').value] || images[ui.result.refRole];
   while (nv.volumes.length) nv.removeVolume(nv.volumes[0]);
   nv.addVolume(bg);
   if ($('#optBrain').checked && images.brain) nv.addVolume(images.brain);
@@ -386,20 +415,24 @@ async function onResult(m) {
   ui.result = m;
   // viewer volumes
   for (const k of Object.keys(images)) delete images[k];
-  for (const r of ROLES) images[r] = await makeImage(m.vols[r], r.toLowerCase() + '.nii', { colormap: 'gray' });
+  for (const r of m.roles) images[r] = await makeImage(m.vols[r], r.toLowerCase() + '.nii', { colormap: 'gray' });
   images.brain = await makeImage(m.vols.brain, 'brain.nii', { colormap: 'gray', opacity: 0.18 });
   images.brain.setColormapLabel({ R: [0, 90], G: [0, 200], B: [0, 255], A: [0, 120], I: [0, 1], labels: ['', 'brain'] });
   images.seg = await makeImage(m.vols.seg, 'seg.nii', { opacity: +$('#opacity').value });
   const sel = $('#bgSel');
-  sel.innerHTML = ROLES.map(r => `<option value="${r}">${r === m.refRole ? r + ' (reference)' : r + ' (registered)'}</option>`).join('');
-  sel.value = 'T1c'; sel.disabled = false;
+  sel.innerHTML = m.roles.map(r => `<option value="${r}">${r === m.refRole ? r + ' (reference)' : r + ' (registered)'}</option>`).join('');
+  sel.value = m.inputs.includes('T1c') ? 'T1c' : m.inputs[0]; sel.disabled = false;
   $('#empty').hidden = true;
   await showVolumes();
   // jump to the tumor centre
   try { centreOnTumor(m); } catch (e) { /* ignore */ }
   renderVolumes();
   renderQC();
-  $$('[data-exp]').forEach(b => (b.disabled = false));
+  for (const b of $$('[data-exp]')) {
+    const r = b.dataset.exp.startsWith('input:') ? b.dataset.exp.slice(6) : null;
+    b.disabled = !!r && !m.roles.includes(r);
+    if (r) b.textContent = r + (m.roles.includes(r) && !m.inputs.includes(r) ? ' (registered)' : ' input');
+  }
   $('#copyBtn').disabled = false; $('#csvBtn').disabled = false;
   if (m.gpuFailed) { setGpuFailed(true); showDevice(); }
   else if (m.usedGpu) { setGpuFailed(false); showDevice(); }
@@ -435,7 +468,11 @@ function renderVolumes() {
   $$('.swatch').forEach(s => s.onclick = () => { const l = +s.dataset.l; ui.hidden.has(l) ? ui.hidden.delete(l) : ui.hidden.add(l); renderVolumes(); showVolumes(); });
   const vs = m.voxelSize.map(v => v.toFixed(2)).join(' x ');
   $('#volMeta').textContent = `Counted on the ${m.refRole} grid: ${m.dims.join(' x ')} voxels of ${vs} mm (${m.voxelVolume.toFixed(3)} mm3 each).`;
-  $('#expNote').textContent = 'Saved on the grid of the reference ' + m.refRole + ' as loaded. Labels: 0 background, ' + m.labels.map(l => l.value + ' ' + l.name).join(', ') + '. Inputs are the registered, brain-extracted images given to HD-GLIO.';
+  const mn = m.model.id === 'hdglio' ? 'HD-GLIO' : m.model.name;
+  $('#expNote').textContent = 'Saved on the grid of the reference ' + m.refRole + ' as loaded. Labels: 0 background, ' + m.labels.map(l => l.value + ' ' + l.name).join(', ') + '. ' +
+    (m.model.kind === 'raidionics' ? 'The ' + m.inputs.join(', ') + ' input is the image given to Raidionics (not brain-extracted).' : 'Inputs are the registered, brain-extracted images given to ' + mn + '.') +
+    (m.roles.some(r => !m.inputs.includes(r)) ? ' Other sequences are exported as registered.' : '');
+  $('#tableNote').textContent = m.model.id === 'hdglio' ? 'HD-GLIO has no separate necrosis class.' : (m.model.tableNote || '');
 }
 
 function renderQC() {
@@ -446,13 +483,14 @@ function renderQC() {
     const cls = q.check ? ' class="bad"' : '';
     rows.push(`<span>${r}</span><span${cls}>rot ${q.rDeg.map(v => v.toFixed(1)).join('/')} deg, shift ${q.t.map(v => v.toFixed(1)).join('/')} mm, NMI ${q.nmi.toFixed(3)}${q.check ? ' - large: check alignment' : ''}</span>`);
   }
-  $('#regQC').innerHTML = `<div class="qc">${rows.join('')}</div><p>Switch the background to each registered sequence to check the alignment.</p>`;
+  $('#regQC').innerHTML = rows.length ? `<div class="qc">${rows.join('')}</div><p>Switch the background to each registered sequence to check the alignment.</p>` : 'Only ' + m.refRole + ' was loaded: nothing to register.';
   const dev = m.backend === 'webgpu' ? 'GPU (WebGPU' + (m.gpu && m.gpu.vendor ? ', ' + m.gpu.vendor : '') + ')' : 'CPU (' + (ui.env ? ui.env.threads : '?') + ' threads)';
   const tm = m.timing;
   const wf = { q8: '8-bit weights', f16: '16-bit weights', f32: '32-bit weights' }[m.model.weights] || '';
   $('#runInfo').innerHTML = `<div class="qc"><span>Model</span><span>${esc(m.model.name)} ${esc(m.model.version || '')}${wf ? ', ' + wf : ''}</span>` +
     (m.bet ? `<span>Brain mask</span><span>HD-BET ${esc(m.bet)}</span>` : '') +
-    `<span>Compute</span><span>${dev}</span><span>Augmentation</span><span>${m.tta ? '8 mirrored passes' : 'off'}</span>` +
+    `<span>Compute</span><span>${dev}</span><span>Augmentation</span><span>${m.tta ? '8 mirrored passes' : m.model.kind === 'raidionics' ? 'none (as in Raidionics)' : 'off'}</span>` +
+    (m.segInfo ? `<span>Raidionics</span><span>head crop and 1 mm grid ${m.segInfo.resampledDims.join(' x ')}, ${m.segInfo.patches} patches</span>` : '') +
     `<span>Time</span><span>${fmtMs(tm.total)} (prepare ${fmtMs(tm.prepare)}, HD-BET ${fmtMs(tm.hdbet)}, registration ${fmtMs(tm.register)}, ${esc((m.model && m.model.id !== 'hdglio' ? 'segmentation' : 'HD-GLIO'))} ${fmtMs(tm.hdglio)})</span></div>` +
     (m.notes.length ? '<p class="warn">' + m.notes.map(esc).join('<br>') + '</p>' : '');
 }
@@ -486,7 +524,7 @@ $('#csvBtn').onclick = () => {
     ['# test_time_augmentation', m.tta ? 'on' : 'off'], ['# analysed', new Date().toISOString().slice(0, 10)],
   ];
   const csv = [...meta, ...tableRows()].map(r => r.map(v => /[",\n]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : v).join(',')).join('\n') + '\n';
-  download('hdglio_volumes.csv', new Blob([csv], { type: 'text/csv' }));
+  download((m.model.id || 'hdglio') + '_volumes.csv', new Blob([csv], { type: 'text/csv' }));
 };
 
 function download(name, blob) {
