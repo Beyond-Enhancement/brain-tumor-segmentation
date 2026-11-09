@@ -160,7 +160,8 @@ augmentation on both sides, 22 voxels differ (Dice 0.9991 / 0.9965). The HD-BET 
 184 boundary voxels (Dice 0.99975). The nnU-Net BraTS 2020 add-on differs from the original
 PyTorch network at 1 voxel (Dice 1.0 for ET, NCR and TC; 0.99991 for ED). The Raidionics FLAIR
 add-on, against the original raidionicsseg code on the same FLAIR and brain mask, differs at
-2 voxels on TCGA-DU-7294 (Dice 0.99993; 30.27 cm3 on both sides) and RAIDFG on TCGA-FG-6692.
+2 voxels on TCGA-DU-7294 (Dice 0.99993; 30.27 cm3 on both sides) and at 3 on TCGA-FG-6692
+(Dice 0.99972; 24.10 vs 24.09 cm3).
 
 **Weight precision.** HD-GLIO and HD-BET are stored as 8-bit integers per output channel and
 restored to 32-bit floating point at load, which keeps the executable under GitHub's 100 MB file

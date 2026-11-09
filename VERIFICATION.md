@@ -268,15 +268,17 @@ ships with 16-bit weights (44 MB).
 | Case | Loaded | Workbench cm3 | raidionicsseg cm3 | Differing voxels | Dice |
 |---|---|---|---|---|---|
 | TCGA-DU-7294 | FLAIR only | 30.274 | 30.270 | 2 of 4,456,448 | 0.99993 |
-| TCGA-FG-6692 | all four, registered to FLAIR | RAIDFG_WB | RAIDFG_REF | RAIDFG_DIFF of 1,384,448 | RAIDFG_DICE |
+| TCGA-FG-6692 | all four, registered to FLAIR | 24.102 | 24.089 | 3 of 1,384,448 | 0.99972 |
 
-The two DU-7294 voxels come from ONNX Runtime Web's WebAssembly kernels rounding differently from
-the native CPU build. RAIDWEBGPU
+The few differing voxels come from ONNX Runtime Web's WebAssembly kernels rounding differently
+from the native CPU build (the Node runs above, with the same 16-bit weights, gave none). RAIDWEBGPU
 
 **FLAIR-only runs and the other models.** The run button needs only the sequences the selected
 model uses; others that are chosen are registered to the reference for viewing and exported as
 registered images. With HD-GLIO and the BraTS model all four are still required, and the demo
-case gives the same results as before: RAIDREGRESSION
+case gives the same results as before: HD-GLIO enhancing 7.73, non-enhancing 13.92, brain 1656 cm3,
+and the BraTS model ET 7.00, NCR 1.71, ED 24.67 cm3, with segmentation files identical voxel for
+voxel to the version 1.1 runs.
 
 ## Run time
 
