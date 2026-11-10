@@ -117,7 +117,9 @@ Privacy & Security** and click **Open Anyway**.
 
 A run needs about 3 to 4 GB of free memory (the browser holds the volumes and the network's
 patches). A FLAIR-only run with the Raidionics model, whose patches are 160^3, peaked at about
-4 GB across all browser processes on the test machine.
+4 GB across all browser processes on the test machine. Running several models at once needs no
+more: each network is released before the next is loaded (all three models also peaked at
+4 GB).
 
 The executables are unsigned. Workstations that allow only approved software may block them
 until IT approves them.

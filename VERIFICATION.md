@@ -324,6 +324,12 @@ tumor HD-GLIO vs BraTS 0.900; non-enhancing abnormality 0.673. Run A took 13 min
 2-core machine (HD-BET 4 min 52 s, registration 33 s, HD-GLIO 2 min 36 s, BraTS 2 min 52 s,
 Raidionics 2 min 50 s).
 
+**Executable and memory.** The same three-model run through the 1.3.0 Linux build and its
+launcher (both add-on files next to it) gave segmentations identical to run A for all three
+models, with no request leaving the computer, in 13 min 47 s. All browser processes together
+peaked at 4.1 GB (resident memory sampled every 2 s), the same as the single-model Raidionics
+run in section 6, because each network is released before the next is loaded.
+
 ## Run time
 
 Demo case on the 2-core test machine, CPU (WebAssembly), no augmentation: 9 min (HD-BET
