@@ -1,5 +1,5 @@
 // End-to-end test of the page in headless Chrome.
-//   node test/e2e.mjs <base url> <out dir> [--dicom DIR | --files a.nii.gz,b.nii.gz] [--model ID] [--ref T1c|FLAIR]
+//   node test/e2e.mjs <base url> <out dir> [--dicom DIR | --files a.nii.gz,b.nii.gz] [--model ID[,ID...]] [--ref T1c|FLAIR]
 //                     [--grid iso] [--webgpu] [--tta] [--timeout ms]
 // Loads the built-in demo case (or a DICOM folder, or NIfTI files), runs the pipeline, checks the
 // volume table, exports every available NIfTI, and saves screenshots. Prints a JSON summary.
@@ -26,7 +26,15 @@ const t0 = Date.now();
 await page.goto(base, { waitUntil: 'load' });
 await page.waitForFunction(() => window.__hdglio && document.querySelectorAll('.demo').length > 0, null, { timeout: 30000 }).catch(() => {});
 const modelArg = arg('--model');
-if (modelArg) { await page.waitForFunction(m => [...document.querySelectorAll('#optModel option')].some(o => o.value === m), modelArg, { timeout: 60000 }); await page.selectOption('#optModel', modelArg); }
+if (modelArg) {
+  // check exactly these models (comma-separated ids), in the page's model list
+  const want = modelArg.split(',');
+  await page.waitForFunction(w => w.every(id => document.querySelector(`#modelList input[value="${id}"]`)), want, { timeout: 60000 });
+  for (const box of await page.$$('#modelList input[name="model"]')) {
+    const id = await box.getAttribute('value');
+    if ((await box.isChecked()) !== want.includes(id)) await box.click();
+  }
+}
 if (niftis) {
   await page.setInputFiles('#filesInput', niftis.split(','));
 } else if (dicom) {
@@ -52,7 +60,7 @@ const tRun = Date.now();
 await page.click('#runBtn');
 let last = '';
 const iv = setInterval(async () => { try { const s = await page.$eval('#steps', e => e.innerText.replace(/\s+/g, ' ')); if (s !== last) { last = s; console.log('[steps]', s.slice(0, 200)); } } catch (e) {} }, 15000);
-await page.waitForFunction(() => !document.querySelector('[data-exp="seg"]').disabled || [...document.querySelectorAll('.toast.err')].length, null, { timeout, polling: 1000 });
+await page.waitForFunction(() => !document.querySelector('#copyBtn').disabled || [...document.querySelectorAll('.toast.err')].length, null, { timeout, polling: 1000 });
 clearInterval(iv);
 const runMs = Date.now() - tRun;
 const errToast = await page.$$eval('.toast.err', t => t.map(x => x.textContent));
@@ -61,9 +69,26 @@ await page.screenshot({ path: path.join(out, '2-result.png') });
 const table = await page.$$eval('#volTable tbody tr', rows => rows.map(r => r.innerText.replace(/\s+/g, ' ').trim()));
 const qc = await page.$eval('#regQC', e => e.innerText);
 const info = await page.$eval('#runInfo', e => e.innerText);
+// model comparison (two or more models): volumes, and the pair table for each region
+const rowsOf = sel => page.$$eval(sel + ' tr', rows => rows.map(r => r.innerText.replace(/\s+/g, ' ').trim()));
+let cmp = null;
+if (!errToast.length && !(await page.$eval('#cmpSection', e => e.hidden))) {
+  cmp = { volumes: await rowsOf('#cmpVolTable'), pairs: {} };
+  for (const r of await page.$$eval('#cmpRegion option', o => o.map(x => x.value))) {
+    await page.selectOption('#cmpRegion', r);
+    cmp.pairs[r] = await rowsOf('#cmpPairTable tbody');
+  }
+  await page.selectOption('#cmpRegion', 'whole');
+  await page.click('#cmpShow');
+  await page.waitForFunction(() => document.querySelector('#segSel').value === 'cmp', null, { timeout: 30000 });
+  await page.waitForTimeout(2500);
+  await page.screenshot({ path: path.join(out, '2-agreement.png') });
+  cmp.legend = await page.$eval('#cmpLegend', e => e.innerText.replace(/\s+/g, ' '));
+}
 // exports
 const exported = {};
-for (const what of ['seg', 'brain', 'input:T1', 'input:T1c', 'input:T2', 'input:FLAIR']) {
+const exps = await page.$$eval('[data-exp]', bs => bs.filter(b => !b.hidden).map(b => b.dataset.exp));
+for (const what of exps) {
   if (errToast.length) break;
   if (await page.$eval(`[data-exp="${what}"]`, b => b.disabled)) continue;
   const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 60000 }), page.click(`[data-exp="${what}"]`)]);
@@ -77,7 +102,7 @@ if (csv) await csv.saveAs(path.join(out, csv.suggestedFilename()));
 for (const v of [0, 1, 2]) { await page.click(`#views button[data-view="${v}"]`); await page.waitForTimeout(400); await page.screenshot({ path: path.join(out, `3-view${v}.png`) }); }
 await page.click('#views button[data-view="3"]');
 const outside = [...new Set(requests.filter(u => !u.startsWith(base) && !u.startsWith('blob:') && !u.startsWith('data:')))];
-const summary = { roles, roleMeta, runMs, table, qc, info, exported, errors: errors.filter(e => !/favicon|404 \(File not found\)/.test(e)), errToast, outsideRequests: outside, totalMs: Date.now() - t0, nRequests: requests.length };
+const summary = { roles, roleMeta, runMs, table, cmp, qc, info, exported, errors: errors.filter(e => !/favicon|404 \(File not found\)/.test(e)), errToast, outsideRequests: outside, totalMs: Date.now() - t0, nRequests: requests.length };
 fs.writeFileSync(path.join(out, 'summary.json'), JSON.stringify(summary, null, 1));
 fs.writeFileSync(path.join(out, 'console.log'), logs.join('\n'));
 console.log(JSON.stringify(summary, null, 1));

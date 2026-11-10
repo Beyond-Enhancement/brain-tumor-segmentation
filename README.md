@@ -7,8 +7,10 @@ hyperintensity** model (Faanes, Bouget et al., Sci Rep 2026), which needs only a
 non-enhancing gliomas. Drop in a DICOM folder, a `.zip` or NIfTI files. It finds the T1, T1c, T2
 and FLAIR series, prepares them as the HD-GLIO instructions prescribe (reorientation, HD-BET brain
 extraction, rigid registration to a reference sequence, masking), runs the chosen model and shows
-the result on a 3-plane viewer with the compartment volumes in cm3. The segmentation and the
-prepared inputs are saved as NIfTI. All processing happens on the computer it runs on.
+the result on a 3-plane viewer with the compartment volumes in cm3. Several models can run on the
+same prepared images in one go and be compared, as volumes, Dice and an agreement overlay. The
+segmentations and the prepared inputs are saved as NIfTI. All processing happens on the computer
+it runs on.
 
 ![Workbench (v1.1.1) running the TCGA-FG-6692 demo with HD-GLIO](docs/workbench.png)
 
@@ -46,8 +48,41 @@ includes edema.
 30.27 cm3 of FLAIR hyperintensity, the same as the original Raidionics code to 2 voxels.*
 
 The volumes table lists each compartment in cm3, counted on the grid of the reference sequence,
-plus the HD-BET brain volume. **Copy table** and **Save CSV** export it. The CSV carries the model,
-grid and options used, and no patient information.
+plus the HD-BET brain volume. **Copy table** and **Save CSV** export it. The CSV carries the
+models, grid and options used, and no patient information.
+
+### Comparing models
+
+Check more than one model under *Segmentation models* and they run one after the other on the
+same prepared images (one brain extraction, one registration, one reference grid), so their
+outputs line up voxel for voxel. Each model keeps the preparation it was validated with: HD-GLIO
+and the BraTS model get the brain-extracted images, Raidionics gets the FLAIR as it is. The
+**Model comparison** panel then shows:
+
+- the volume of each shared region per model, for the regions below;
+- for the chosen region, every pair of models: Dice, and the volume found by both, by the first
+  only and by the second only (cm3);
+- **Show on viewer**: an agreement map of the chosen pair (first only, second only, both), also
+  under *Labels* above the viewer, and exportable as NIfTI (1 first only, 2 second only, 3 both).
+
+| Region | HD-GLIO | nnU-Net BraTS 2020 | Raidionics FLAIR |
+|---|---|---|---|
+| Whole abnormality | 1 + 2 | 1 + 2 + 4 (WT) | 1 |
+| Enhancing tumor | 2 | 4 (ET) | - |
+| Non-enhancing abnormality | 1 | 1 + 2 (NCR + ED) | - |
+
+The models were trained on different definitions (HD-GLIO has no necrosis class; BraTS separates
+necrosis from edema; Raidionics outlines the FLAIR hyperintensity), so a Dice below 1 reflects
+both disagreement and these differences. *Save CSV* then holds the compartment volumes of every
+model, the region volumes and the pairwise agreement in one table.
+
+![Three models compared on the TCGA-FG-6692 demo](docs/model-comparison.png)
+
+*HD-GLIO, the nnU-Net BraTS model and Raidionics FLAIR run together on the TCGA-FG-6692 demo
+(registered to T1), with the agreement map of HD-GLIO and BraTS for the whole abnormality: HD-GLIO
+only (blue), BraTS only (pink), both (yellow). Whole abnormality Dice 0.787 (HD-GLIO vs BraTS),
+0.908 (HD-GLIO vs Raidionics), 0.805 (BraTS vs Raidionics); enhancing tumor 0.900 (HD-GLIO vs
+BraTS).*
 
 ## Download
 
@@ -97,11 +132,13 @@ until IT approves them.
 2. **Check the sequences.** T1, T1c, T2 and FLAIR are guessed from the series descriptions and
    headers (TR, TE, TI, contrast agent) or the NIfTI file names. When three are recognised and
    exactly one series is left over, it takes the remaining slot and is marked *by elimination -
-   check it*. Change any of them in the drop-downs. With the Raidionics model, T1, T1c and T2 are
-   optional: any that are chosen are registered to the reference and can be shown as background.
+   check it*. Change any of them in the drop-downs. The checked models decide which are needed:
+   with the Raidionics model alone, T1, T1c and T2 are optional, and any that are chosen are
+   registered to the reference and can be shown as background.
 3. **Options.**
-   - *Segmentation model*: HD-GLIO (built in) or an add-on model (nnU-Net BraTS 2020, Raidionics
-     FLAIR hyperintensity).
+   - *Segmentation models*: HD-GLIO (built in) and any add-on models (nnU-Net BraTS 2020,
+     Raidionics FLAIR hyperintensity). Check one or more; with more than one, the results can be
+     compared (see Comparing models).
    - *Register to*: the reference sequence. T1, as HD-GLIO was published, or T1c or FLAIR, for
      example when that sequence has the thinnest slices. HD-BET runs on the reference, the other
      three are registered to it, and the volumes and exports are on its grid. The brain-mask
@@ -114,25 +151,29 @@ until IT approves them.
    - The reference, grid and model choices are remembered in this browser.
    - *Test-time augmentation*: the published HD-GLIO averages 8 mirrored predictions. It is off by
      default because it takes about 8 times longer; switch it on to reproduce the published
-     setting exactly. Raidionics does not use it, so it is unavailable with that model.
+     setting exactly. It applies to the nnU-Net models only; Raidionics does not use it.
    - With the Raidionics model, register to FLAIR with the grid as acquired to run it exactly as
-     Raidionics does (the page says so when another choice is made).
+     Raidionics does (the page says so when another choice is made). When it runs together with
+     HD-GLIO or the BraTS model, that means all of them are on the FLAIR grid.
    - *Compute*: automatic uses the GPU through WebGPU when there is one, otherwise the CPU. If
      the GPU stops responding during a run, that step restarts on the CPU and the run finishes
      there (see Troubleshooting).
 4. **Run segmentation.** Progress is shown per step. On the CPU of a 2-core test machine the
    demo case took 9 minutes (HD-BET 5.4 min, registration 0.7 min, HD-GLIO 2.9 min), or 32
    minutes with test-time augmentation. The Raidionics model on the FLAIR of TCGA-DU-7294 alone
-   took 7.5 minutes (HD-BET 6.8 min, Raidionics 0.7 min). More CPU cores, or a GPU through
+   took 7.5 minutes (HD-BET 6.8 min, Raidionics 0.7 min). With several models, the preparation
+   runs once and each model adds its own time (all three models on the demo: 13.7 minutes). More CPU cores, or a GPU through
    WebGPU, make it considerably faster.
 5. **Review.** Axial, coronal, sagittal (anterior to the left) or 3-plane view. Choose the
-   background sequence, the overlay opacity, crosshairs on or off, and which compartments are
-   shown (click a colour swatch). The *Registration
+   background sequence, which model's labels (or the agreement map) are shown, the overlay
+   opacity, crosshairs on or off, and which compartments are shown (click a colour swatch). The
+   *Registration
    check* lists each sequence's rotation and shift and flags large ones. Switch the background
    to each registered sequence to confirm the alignment.
-6. **Export.** Segmentation, brain mask and the prepared inputs as `.nii.gz` (with Raidionics:
-   the FLAIR as given to the model, which is not brain-extracted, and the other sequences as
-   registered). Files are on
+6. **Export.** Each model's segmentation, the agreement map (with several models), the brain
+   mask and the prepared inputs as `.nii.gz` (inputs are brain-extracted as HD-GLIO and the BraTS
+   model got them; with Raidionics alone, the FLAIR as given to it, which is not brain-extracted;
+   other sequences as registered). Files are on
    the reference grid with the same voxel order and orientation as the reference series that was
    loaded, so they overlay it in any viewer.
 
@@ -258,6 +299,8 @@ node test/e2e.mjs http://127.0.0.1:8771/ test/out/e2e-raid --files FLAIR.nii.gz 
 python3 test/validate/raidionics_reference.py FLAIR.nii.gz test/out/e2e-raid/hdbet_brain_mask.nii.gz <t2f folder> test/out/e2e-raid/ref   # raidionicsseg
 python3 test/validate/compare_raidionics.py test/out/e2e-raid/ref test/out/e2e-raid/raidionics-flair_segmentation.nii.gz
 node test/unit/raidionics_test.mjs FLAIR.nii.gz mask.nii.gz addons/raidionics-flair test/out/raid-js --onnx <t2f>/0/model.onnx   # same, in Node, with intermediate arrays
+node test/e2e.mjs http://127.0.0.1:8771/ test/out/e2e-multi --model hdglio,brats2020,raidionics-flair   # several models in one run
+python3 test/validate/check_model_comparison.py test/out/e2e-multi --same hdglio=<single-model run>/hdglio_segmentation.nii.gz   # recompute the comparison
 node test/gpu_loss_test.mjs http://127.0.0.1:47821/ test/out/gpu-loss   # GPU reset mid-run -> CPU fallback
 node test/unit/roles_test.mjs                       # sequence assignment from file names
 ```

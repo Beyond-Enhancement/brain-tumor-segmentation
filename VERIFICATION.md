@@ -5,6 +5,7 @@ changes only the page markup (the wrapping of two option labels); the processing
 and add-on file are unchanged, and the demo case gives the same result (checked when taking the
 README screenshot). Section 6 covers v1.2.0 (2026-11-09): the Raidionics FLAIR add-on and
 runs with fewer than four sequences; HD-GLIO and the BraTS add-on were re-run and are unchanged.
+Section 7 covers v1.3.0 (2026-11-09): several models in one run, and their comparison.
 Test machine: Linux container, 2 CPU cores, 7 GB RAM, no GPU,
 headless Chrome. Unless stated otherwise the case is TCGA-FG-6692 (the built-in demo: 2D axial
 T1, T1c, T2, FLAIR, 0.9 x 0.9 x 5.5 mm).
@@ -294,6 +295,34 @@ registered images. With HD-GLIO and the BraTS model all four are still required,
 case gives the same results as before: HD-GLIO enhancing 7.73, non-enhancing 13.92, brain 1656 cm3,
 and the BraTS model ET 7.00, NCR 1.71, ED 24.67 cm3, with segmentation files identical voxel for
 voxel to the version 1.1 runs.
+
+## 7. Version 1.3.0: several models in one run, and their comparison
+
+**What changed.** The checked models run one after the other after a single preparation
+(reorientation, HD-BET, registration); each gets the inputs it got before (brain-extracted
+for the nnU-Net models, the FLAIR as it is for Raidionics), and each network is released from
+memory before the next is loaded. The comparison is computed from the label volumes on the
+reference grid: per model the volume of the shared regions (whole abnormality, enhancing tumor,
+non-enhancing abnormality, as listed in the README), and per pair and region Dice and the
+volumes found by both, by the first only and by the second only.
+
+**Same results as single-model runs.** Two runs of the TCGA-FG-6692 demo, then
+`test/validate/check_model_comparison.py`:
+
+| Run | Models | Reference | Result |
+|---|---|---|---|
+| A | HD-GLIO, nnU-Net BraTS, Raidionics FLAIR | T1 | HD-GLIO and BraTS segmentations identical voxel for voxel to the single-model runs of section 6 (0 of 1,490,944 voxels differ) |
+| B | HD-GLIO, Raidionics FLAIR | FLAIR | Raidionics segmentation identical to the single-model run compared with raidionicsseg in section 6 (0 of 1,384,448) |
+
+**Comparison numbers.** The checker recomputes every compartment volume, region volume and
+pairwise figure from the exported segmentations with numpy and compares them with the page's
+CSV: largest differences 0.0005 cm3 and 0.00004 in Dice (rounding of the CSV). The exported
+agreement maps (1 first only, 2 second only, 3 both) match the two segmentations voxel for
+voxel. Run A, whole abnormality: HD-GLIO vs BraTS Dice 0.787 (both 21.65 cm3, HD-GLIO only
+0.004, BraTS only 11.73), HD-GLIO vs Raidionics 0.908, BraTS vs Raidionics 0.805; enhancing
+tumor HD-GLIO vs BraTS 0.900; non-enhancing abnormality 0.673. Run A took 13 min 42 s on the
+2-core machine (HD-BET 4 min 52 s, registration 33 s, HD-GLIO 2 min 36 s, BraTS 2 min 52 s,
+Raidionics 2 min 50 s).
 
 ## Run time
 

@@ -33,6 +33,7 @@ self.onmessage = async ev => {
     else if (m.type === 'files') await loadFiles(m.files);
     else if (m.type === 'run') await run(m.assignment, m.options);
     else if (m.type === 'export') doExport(m.what, m.id);
+    else if (m.type === 'agreement') postAgreement(m.a, m.b, m.region, m.id);
   } catch (e) {
     post('error', { message: e && e.message ? e.message : String(e), stage: m.type });
   }
@@ -228,22 +229,41 @@ const npSpacing = aff => { const s = G.spacing(aff); return [s[2], s[1], s[0]]; 
 // ---------------------------------------------------------------------------------------
 // Pipeline
 
+// Regions that mean the same thing in different models, for comparing them. A model's own
+// compartments stay as they are; these are only used for the comparison table and maps.
+const REGION_DEFS = [
+  { key: 'whole', name: 'Whole abnormality', short: 'Whole' },
+  { key: 'enh', name: 'Enhancing tumor', short: 'Enh.' },
+  { key: 'nonenh', name: 'Non-enhancing abnormality', short: 'Non-enh.' },
+];
+const MODEL_REGIONS = {
+  hdglio: { whole: [1, 2], enh: [2], nonenh: [1] },
+  brats2020: { whole: [1, 2, 4], enh: [4], nonenh: [1, 2] },
+  'raidionics-flair': { whole: [1] },
+};
+const regionsFor = cfg => cfg.compareRegions || MODEL_REGIONS[cfg.id] || { whole: cfg.labels.map(l => l.value) };
+const labelLut = labels => { const t = new Uint8Array(256); for (const l of labels) t[l] = 1; return t; };
+
 async function run(assignment, opt) {
   const T = { start: now() };
   const log = [];
   const note = s => { log.push(s); };
-  // the model decides which sequences are needed; any others loaded are registered for viewing
-  const modelId = opt.model || 'hdglio';
-  if (modelId !== 'hdglio' && !state.models[modelId]) throw new Error('The selected model is not loaded. Add its model file again.');
-  const gcfg = await loadModelConfig(modelId);
-  const mname = gcfg.short || gcfg.name;
-  const required = gcfg.inputChannels;
-  for (const r of required) if (!assignment[r]) throw new Error(mname + ' needs a series for ' + r);
+  // the selected models decide which sequences are needed; any others loaded are registered for viewing
+  const modelIds = [...new Set(opt.models && opt.models.length ? opt.models : [opt.model || 'hdglio'])];
+  const cfgs = [];
+  for (const id of modelIds) {
+    if (id !== 'hdglio' && !state.models[id]) throw new Error('A selected model is not loaded (' + id + '). Add its model file again.');
+    cfgs.push(await loadModelConfig(id));
+  }
+  const mn = c => c.short || c.name;
+  for (const c of cfgs) for (const r of c.inputChannels) if (!assignment[r]) throw new Error(mn(c) + ' needs a series for ' + r);
+  const required = ROLES.filter(r => cfgs.some(c => c.inputChannels.includes(r)));
   const loaded = ROLES.filter(r => assignment[r]);
   const ids = loaded.map(r => assignment[r]);
   if (new Set(ids).size !== ids.length) throw new Error('Each sequence must be a different series');
   let refRole = opt.reference || 'T1';
   if (!loaded.includes(refRole)) { note(refRole + ' is not loaded: ' + required[0] + ' is the reference'); refRole = required[0]; }
+  const multi = cfgs.length > 1;
 
   // 1) volumes, reoriented to standard (fslreorient2std)
   progress('prepare', 0, 'Assembling volumes');
@@ -291,6 +311,7 @@ async function run(assignment, opt) {
     brain = new Uint8Array(r.seg.length);
     for (let i = 0; i < brain.length; i++) brain[i] = r.seg[i] === 1 ? 1 : 0;
     if (opt.lcc !== false) brain = largestComponent(brain, grid.dims);
+    if (multi) await releaseNetwork('hdbet'); // several networks in one run: keep only one in memory
   } else {
     brain = new Uint8Array(refOnGrid.data.length);
     for (let i = 0; i < brain.length; i++) brain[i] = refOnGrid.data[i] > 0 ? 1 : 0;
@@ -321,60 +342,129 @@ async function run(assignment, opt) {
   }
   T.register = now();
 
-  // 4) model inputs. nnU-Net models (HD-GLIO and add-ons): all sequences masked with the
-  // reference brain mask (fslmaths -mas). Raidionics: the image as it is (the model crops the
-  // head itself); the brain mask is used afterwards to drop findings outside the brain.
-  const raid = gcfg.kind === 'raidionics';
-  const inputs = {};
-  for (const r of required) {
-    if (raid) { inputs[r] = onRef[r]; continue; }
-    const d = new Float32Array(onRef[r]); for (let i = 0; i < d.length; i++) if (!brain[i]) d[i] = 0; inputs[r] = d;
-  }
+  // 4) model inputs. nnU-Net models (HD-GLIO and add-ons): sequences masked with the reference
+  // brain mask (fslmaths -mas). Raidionics: the image as it is (the model crops the head itself);
+  // the brain mask is used afterwards to drop findings outside the brain.
+  const masked = {};
+  const getMasked = r => {
+    if (!masked[r]) { const d = new Float32Array(onRef[r]); for (let i = 0; i < d.length; i++) if (!brain[i]) d[i] = 0; masked[r] = d; }
+    return masked[r];
+  };
 
-  // 5) tumor segmentation (HD-GLIO, or an add-on model)
-  progress('hdglio', 0, 'Loading ' + mname);
-  const segProgress = netProgress('hdglio', mname);
-  let segInfo = null;
-  const { res } = await runNetwork(modelId, mname, 'hdglio', ctx, raid
-    ? net => predictRaidionics({ dims: grid.dims, affine: grid.affine, data: inputs[required[0]] }, opt.skullStrip ? brain : null, net.cfg, (p, d) => net.run(p, d), { shouldStop: cancelled, onProgress: segProgress })
-    : net => predictCase(required.map(r => inputs[r]), npShape(grid.dims), npSpacing(grid.affine), net.cfg, (p, d) => net.run(p, d), { tta: !!opt.tta, shouldStop: cancelled, onProgress: segProgress }));
-  const seg = res.seg;
-  if (raid) { segInfo = res.info; if (res.info.removedOutsideBrain) note('Raidionics: ' + (res.info.removedOutsideBrain * G.voxelVolume(grid.affine) / 1000).toFixed(2) + ' cm3 outside the brain mask removed (brain overlap refinement)'); }
-  backend = ctx.backend;
-  T.hdglio = now();
-
-  // 6) volumes
+  // 5) tumor segmentation, one model after the other on the same prepared images
   const vv = G.voxelVolume(grid.affine);
-  const counts = new Array(256).fill(0); // by label value (BraTS uses 1, 2, 4)
-  for (const v of seg) counts[v]++;
-  const comps = gcfg.compartments.map(c => {
-    const n = c.labels.reduce((a, l) => a + counts[l], 0);
-    return { key: c.key, name: c.name, labels: c.labels, voxels: n, cm3: n * vv / 1000 };
-  });
+  const results = [];
+  for (const c of cfgs) {
+    const key = 'seg:' + c.id, name = mn(c), raid = c.kind === 'raidionics';
+    const t0 = now();
+    progress(key, 0, 'Loading ' + name);
+    const pr = netProgress(key, name);
+    const { res } = await runNetwork(c.id, name, key, ctx, raid
+      ? net => predictRaidionics({ dims: grid.dims, affine: grid.affine, data: onRef[c.inputChannels[0]] }, opt.skullStrip ? brain : null, net.cfg, (p, d) => net.run(p, d), { shouldStop: cancelled, onProgress: pr })
+      : net => predictCase(c.inputChannels.map(getMasked), npShape(grid.dims), npSpacing(grid.affine), net.cfg, (p, d) => net.run(p, d), { tta: !!opt.tta, shouldStop: cancelled, onProgress: pr }));
+    if (multi) await releaseNetwork(c.id);
+    if (raid && res.info.removedOutsideBrain) note(name + ': ' + (res.info.removedOutsideBrain * vv / 1000).toFixed(2) + ' cm3 outside the brain mask removed (brain overlap refinement)');
+    const counts = new Array(256).fill(0); // by label value (BraTS uses 1, 2, 4)
+    for (const v of res.seg) counts[v]++;
+    const comps = c.compartments.map(cp => {
+      const n = cp.labels.reduce((a, l) => a + counts[l], 0);
+      return { key: cp.key, name: cp.name, labels: cp.labels, voxels: n, cm3: n * vv / 1000 };
+    });
+    results.push({ cfg: c, seg: res.seg, comps, segInfo: raid ? res.info : null, ms: now() - t0, tta: !!opt.tta && !raid });
+  }
+  backend = ctx.backend;
+  T.seg = now();
+
+  // 6) brain volume, centre of the findings, comparison between models
   const brainCm3 = nBrain * vv / 1000;
   let tumorCenterMM = null;
   {
     const [nx, ny] = grid.dims; let si = 0, sj = 0, sk = 0, cnt = 0;
-    for (let v = 0; v < seg.length; v++) if (seg[v]) { si += v % nx; sj += Math.floor(v / nx) % ny; sk += Math.floor(v / (nx * ny)); cnt++; }
+    const segs = results.map(r => r.seg);
+    for (let v = 0; v < brain.length; v++) {
+      let any = 0; for (const sg of segs) any |= sg[v];
+      if (any) { si += v % nx; sj += Math.floor(v / nx) % ny; sk += Math.floor(v / (nx * ny)); cnt++; }
+    }
     if (cnt) { const A = grid.affine, i = si / cnt, j = sj / cnt, k = sk / cnt; tumorCenterMM = [0, 1, 2].map(r => A[4 * r] * i + A[4 * r + 1] * j + A[4 * r + 2] * k + A[4 * r + 3]); }
   }
+  const compare = compareModels(results, vv);
 
-  state.result = { grid, gridIsNativeRef, refRole, plan: plans[refRole], rawRef: raw[refRole], onRef, inputs, brain, seg, cfg: gcfg };
-  const timing = { prepare: T.prepare - T.start, hdbet: T.hdbet - T.prepare, register: T.register - T.hdbet, hdglio: T.hdglio - T.register, total: T.hdglio - T.start };
+  // inputs as exported: brain-extracted when an nnU-Net model used them, else as given to Raidionics
+  const inputs = {}, inputKind = {}, inputPrefix = {};
+  for (const r of required) {
+    const nn = cfgs.find(c => c.kind !== 'raidionics' && c.inputChannels.includes(r));
+    if (nn) { inputs[r] = getMasked(r); inputKind[r] = 'masked'; inputPrefix[r] = nn.id; }
+    else { inputs[r] = onRef[r]; inputKind[r] = 'raidionics'; inputPrefix[r] = cfgs.find(c => c.inputChannels.includes(r)).id; }
+  }
+  state.result = { grid, gridIsNativeRef, refRole, plan: plans[refRole], rawRef: raw[refRole], onRef, inputs, inputKind, inputPrefix, brain, results };
+  const timing = { prepare: T.prepare - T.start, hdbet: T.hdbet - T.prepare, register: T.register - T.hdbet, seg: T.seg - T.register, total: T.seg - T.start };
 
   // 7) send display volumes (uncompressed NIfTI) to the page
   const vols = {};
   const transfer = [];
-  for (const r of loaded) { const b = writeNifti({ dims: grid.dims, affine: grid.affine, data: onRef[r] }, { dtype: 'f32', gz: false }); vols[r] = b.buffer; transfer.push(b.buffer); }
-  const bm = writeNifti({ dims: grid.dims, affine: grid.affine, data: brain }, { dtype: 'u8', gz: false });
-  const sg = writeNifti({ dims: grid.dims, affine: grid.affine, data: seg }, { dtype: 'u8', gz: false });
-  vols.brain = bm.buffer; vols.seg = sg.buffer; transfer.push(bm.buffer, sg.buffer);
+  const add = (k, data, dtype) => { const b = writeNifti({ dims: grid.dims, affine: grid.affine, data }, { dtype, gz: false }); vols[k] = b.buffer; transfer.push(b.buffer); };
+  for (const r of loaded) add(r, onRef[r], 'f32');
+  add('brain', brain, 'u8');
+  for (const r of results) add('seg:' + r.cfg.id, r.seg, 'u8');
   post('result', {
-    vols, comps, brainCm3, tumorCenterMM, voxelVolume: vv, voxelSize: G.spacing(grid.affine), dims: grid.dims, reg, refRole, roles: loaded, inputs: required,
-    backend, gpu, gpuFailed: ctx.gpuFailed, usedGpu: ctx.usedGpu && !ctx.gpuFailed, timing, notes: log, tta: !!opt.tta && !raid, labels: gcfg.labels, compartments: gcfg.compartments,
-    model: { id: gcfg.id, name: gcfg.name, version: gcfg.version, weights: gcfg.weights.format, source: gcfg.source || null, citation: gcfg.citation || null, license: gcfg.license || null, kind: gcfg.kind || 'nnunet', tableNote: gcfg.tableNote || null },
-    segInfo, bet: opt.skullStrip ? (await loadModelConfig('hdbet')).version : null,
+    vols, brainCm3, tumorCenterMM, voxelVolume: vv, voxelSize: G.spacing(grid.affine), dims: grid.dims, reg, refRole, roles: loaded, inputs: required, inputKind,
+    backend, gpu, gpuFailed: ctx.gpuFailed, usedGpu: ctx.usedGpu && !ctx.gpuFailed, timing, notes: log, tta: results.some(r => r.tta),
+    models: results.map(r => {
+      const c = r.cfg;
+      return { id: c.id, name: c.name, short: mn(c), version: c.version, weights: c.weights.format, source: c.source || null, citation: c.citation || null, license: c.license || null,
+        kind: c.kind || 'nnunet', tableNote: c.tableNote || null, labels: c.labels, compartments: c.compartments, inputs: c.inputChannels, comps: r.comps, segInfo: r.segInfo, ms: r.ms, tta: r.tta };
+    }),
+    compare, bet: opt.skullStrip ? (await loadModelConfig('hdbet')).version : null,
   }, transfer);
+}
+
+// Volumes of the shared regions per model, and for each pair of models and each region both have:
+// Dice, and the volumes found by both, by the first only and by the second only.
+function compareModels(results, vv) {
+  const cm3 = n => n * vv / 1000;
+  const regs = results.map(r => regionsFor(r.cfg));
+  const regions = REGION_DEFS.filter(d => regs.some(g => g[d.key]));
+  const volumes = results.map((r, i) => {
+    const out = {};
+    for (const d of regions) {
+      if (!regs[i][d.key]) continue;
+      const t = labelLut(regs[i][d.key]); let n = 0;
+      for (const v of r.seg) n += t[v];
+      out[d.key] = { labels: regs[i][d.key], voxels: n, cm3: cm3(n) };
+    }
+    return { id: r.cfg.id, regions: out };
+  });
+  const pairs = [];
+  for (let i = 0; i < results.length; i++) for (let j = i + 1; j < results.length; j++) {
+    for (const d of regions) {
+      if (!regs[i][d.key] || !regs[j][d.key]) continue;
+      const ta = labelLut(regs[i][d.key]), tb = labelLut(regs[j][d.key]);
+      const A = results[i].seg, B = results[j].seg;
+      let both = 0, ao = 0, bo = 0;
+      for (let v = 0; v < A.length; v++) { const a = ta[A[v]], b = tb[B[v]]; if (a & b) both++; else if (a) ao++; else if (b) bo++; }
+      const den = 2 * both + ao + bo;
+      pairs.push({ a: results[i].cfg.id, b: results[j].cfg.id, region: d.key, dice: den ? 2 * both / den : null,
+        both: cm3(both), aOnly: cm3(ao), bOnly: cm3(bo), voxels: { both, aOnly: ao, bOnly: bo } });
+    }
+  }
+  return { regions: regions.map(d => ({ ...d, comparable: regs.filter(g => g[d.key]).length >= 2 })), volumes, pairs };
+}
+
+// Agreement map of one region between two models: 1 first model only, 2 second only, 3 both.
+function agreementMap(a, b, region) {
+  const R = state.result;
+  const ra = R.results.find(r => r.cfg.id === a), rb = R.results.find(r => r.cfg.id === b);
+  if (!ra || !rb) throw new Error('Model not in this run');
+  const ga = regionsFor(ra.cfg)[region], gb = regionsFor(rb.cfg)[region];
+  if (!ga || !gb) throw new Error('Region not available for both models');
+  const ta = labelLut(ga), tb = labelLut(gb);
+  const out = new Uint8Array(ra.seg.length);
+  for (let v = 0; v < out.length; v++) out[v] = ta[ra.seg[v]] | (tb[rb.seg[v]] << 1);
+  return out;
+}
+
+async function releaseNetwork(name) {
+  for (const k of Object.keys(state.nets)) if (k.startsWith(name + ':')) { await state.nets[k].release(); delete state.nets[k]; }
 }
 
 // A GPU failure while a network runs (device lost: on Windows usually the driver's 2-second
@@ -432,14 +522,21 @@ function doExport(what, reqId) {
   const R = state.result;
   if (!R) throw new Error('Nothing to export yet');
   let vol, dtype = 'f32', name, descrip;
-  const prefix = (R.cfg && R.cfg.id) || 'hdglio';
-  if (what === 'seg') { vol = toOutputGrid(R.seg, Uint8Array); dtype = 'u8'; name = prefix + '_segmentation.nii.gz'; descrip = (R.cfg.name || 'HD-GLIO').slice(0, 60) + ' segmentation'; }
-  else if (what === 'brain') { vol = toOutputGrid(R.brain, Uint8Array); dtype = 'u8'; name = 'hdbet_brain_mask.nii.gz'; descrip = 'HD-BET brain mask'; }
+  const byId = id => { const r = id ? R.results.find(x => x.cfg.id === id) : R.results[0]; if (!r) throw new Error('Model not in this run'); return r; };
+  if (what === 'seg' || what.startsWith('seg:')) {
+    const r = byId(what.slice(4));
+    vol = toOutputGrid(r.seg, Uint8Array); dtype = 'u8'; name = r.cfg.id + '_segmentation.nii.gz'; descrip = (r.cfg.name || 'HD-GLIO').slice(0, 60) + ' segmentation';
+  } else if (what.startsWith('agree:')) {
+    const [, a, b, region] = what.split(':');
+    vol = toOutputGrid(agreementMap(a, b, region), Uint8Array); dtype = 'u8'; name = 'agreement_' + a + '_vs_' + b + '_' + region + '.nii.gz';
+    descrip = '1 ' + a + ' only, 2 ' + b + ' only, 3 both (' + region + ')';
+  } else if (what === 'brain') { vol = toOutputGrid(R.brain, Uint8Array); dtype = 'u8'; name = 'hdbet_brain_mask.nii.gz'; descrip = 'HD-BET brain mask'; }
   else if (what.startsWith('input:')) {
     const r = what.slice(6);
     if (R.inputs[r]) {
-      vol = toOutputGrid(R.inputs[r], Float32Array); name = prefix + '_input_' + r.toLowerCase() + '.nii.gz';
-      descrip = R.cfg.kind === 'raidionics' ? r + ' as given to Raidionics' : r + ' registered, brain-extracted';
+      const raid = R.inputKind[r] === 'raidionics';
+      vol = toOutputGrid(R.inputs[r], Float32Array); name = R.inputPrefix[r] + '_input_' + r.toLowerCase() + '.nii.gz';
+      descrip = raid ? r + ' as given to Raidionics' : r + ' registered, brain-extracted';
     } else if (R.onRef[r]) {
       vol = toOutputGrid(R.onRef[r], Float32Array); name = 'registered_' + r.toLowerCase() + '.nii.gz'; descrip = r + ' registered to ' + R.refRole;
     } else throw new Error(r + ' was not loaded');
@@ -449,6 +546,12 @@ function doExport(what, reqId) {
   } else throw new Error('Unknown export ' + what);
   const bytes = writeNifti(vol, { dtype, gz: true, descrip });
   post('export', { id: reqId, name, bytes: bytes.buffer }, [bytes.buffer]);
+}
+
+function postAgreement(a, b, region, reqId) {
+  const R = state.result;
+  const bytes = writeNifti({ dims: R.grid.dims, affine: R.grid.affine, data: agreementMap(a, b, region) }, { dtype: 'u8', gz: false });
+  post('agreement', { id: reqId, key: a + ':' + b + ':' + region, bytes: bytes.buffer }, [bytes.buffer]);
 }
 
 loadOrt(BASE).catch(() => {});
