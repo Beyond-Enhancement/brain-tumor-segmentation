@@ -96,3 +96,4 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 | Case | Source | Terms |
 |---|---|---|
 | TCGA-FG-6692 (T1, T1c, T2, FLAIR) | [The Cancer Imaging Archive, TCGA-LGG collection](https://www.cancerimagingarchive.net/collection/tcga-lgg/), via the NIfTI files in [BrainLesion tutorials](https://github.com/BrainLesion/tutorials) (as in laetissimus/brain-tumor-perfusion) | TCIA data: CC BY 3.0. Cite the collection and TCIA |
+| TCGA-DU-7294 (FLAIR; test case and `docs/raidionics-flair.png` only, not shipped) | Same collection and route (as in laetissimus/brain-tumor-perfusion) | TCIA data: CC BY 3.0. Cite the collection and TCIA |

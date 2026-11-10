@@ -3,7 +3,9 @@
 Tested build: v1.0.0, 2026-11-04; section 5 covers what v1.1.0 adds (also 2026-11-04). v1.1.1
 changes only the page markup (the wrapping of two option labels); the processing code, networks
 and add-on file are unchanged, and the demo case gives the same result (checked when taking the
-README screenshot). Test machine: Linux container, 2 CPU cores, 7 GB RAM, no GPU,
+README screenshot). Section 6 covers v1.2.0 (2026-11-09): the Raidionics FLAIR add-on and
+runs with fewer than four sequences; HD-GLIO and the BraTS add-on were re-run and are unchanged.
+Test machine: Linux container, 2 CPU cores, 7 GB RAM, no GPU,
 headless Chrome. Unless stated otherwise the case is TCGA-FG-6692 (the built-in demo: 2D axial
 T1, T1c, T2, FLAIR, 0.9 x 0.9 x 5.5 mm).
 
@@ -221,7 +223,10 @@ rebuilt and drew the result; the page noted the fallback and set *Automatic* to 
 that computer from then on.
 
 **Memory.** A run peaks at about 3 GB in the browser process. Two runs at once on the 7 GB test
-machine exceeded its memory limit and one browser tab was stopped by the system.
+machine exceeded its memory limit and one browser tab was stopped by the system. In version 1.2.0, a
+FLAIR-only Raidionics run of DU-7294 peaked at 4.1 GB summed over all browser processes
+(resident memory sampled every 2 s), and a browser run alongside a raidionicsseg reference run
+(about 2 GB) on the same machine was again stopped by the system.
 
 ## 6. Version 1.2.0: Raidionics FLAIR hyperintensity add-on
 
@@ -271,7 +276,17 @@ ships with 16-bit weights (44 MB).
 | TCGA-FG-6692 | all four, registered to FLAIR | 24.102 | 24.089 | 3 of 1,384,448 | 0.99972 |
 
 The few differing voxels come from ONNX Runtime Web's WebAssembly kernels rounding differently
-from the native CPU build (the Node runs above, with the same 16-bit weights, gave none). RAIDWEBGPU
+from the native CPU build (the Node runs above, with the same 16-bit weights, gave none).
+
+**WebGPU.** The test machine has no GPU, so the network was checked on a software WebGPU adapter
+(SwiftShader) with a 64^3 block of DU-7294's preprocessed FLAIR around the lesion
+(`test/validate/webgpu_raidionics_export.py`): the largest logit difference from ONNX Runtime
+CPU was 4.2e-4 (logits range -100 to 10) and all 28,345 voxels above 0.5 agreed. Speed and memory
+on real GPUs were not measured.
+
+**Executables.** The 1.2.0 Linux build, run through its own launcher with both add-on files
+next to it (both listed under *Segmentation model*), gave the same DU-7294 FLAIR-only
+segmentation as the test server, voxel for voxel, with no request leaving the computer.
 
 **FLAIR-only runs and the other models.** The run button needs only the sequences the selected
 model uses; others that are chosen are registered to the reference for viewing and exported as
@@ -287,3 +302,7 @@ Demo case on the 2-core test machine, CPU (WebAssembly), no augmentation: 9 min 
 HD-GLIO 8 patches of 128^3. Machines with more cores, or with a GPU through WebGPU, should be
 considerably faster; that was not measured here. Test-time augmentation multiplies the HD-GLIO
 time by 8: the same case with augmentation took 31 min 34 s (HD-GLIO 24 min 51 s).
+
+Raidionics FLAIR add-on, same machine, CPU: DU-7294 FLAIR alone 7 min 27 s (HD-BET on the FLAIR
+6 min 47 s, Raidionics 39 s for 2 patches of 160^3); FG-6692 with all four sequences registered
+to FLAIR 5 min 23 s (HD-BET 2 min 19 s, registration 28 s, Raidionics 2 min 36 s for 8 patches).

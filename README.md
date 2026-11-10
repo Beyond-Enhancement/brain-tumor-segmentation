@@ -40,6 +40,11 @@ The **Raidionics FLAIR hyperintensity** add-on has one label:
 For a non-enhancing glioma this is the tumor extent on FLAIR; around an enhancing tumor it also
 includes edema.
 
+![Raidionics FLAIR add-on run on the FLAIR of TCGA-DU-7294 alone](docs/raidionics-flair.png)
+
+*The Raidionics FLAIR add-on on the FLAIR of TCGA-DU-7294 (TCIA, CC BY 3.0) loaded on its own:
+30.27 cm3 of FLAIR hyperintensity, the same as the original Raidionics code to 2 voxels.*
+
 The volumes table lists each compartment in cm3, counted on the grid of the reference sequence,
 plus the HD-BET brain volume. **Copy table** and **Save CSV** export it. The CSV carries the model,
 grid and options used, and no patient information.
@@ -75,8 +80,9 @@ window and the program quits by itself about 30 seconds after that window is clo
 macOS blocks it because it is not signed by a registered developer: open **System Settings >
 Privacy & Security** and click **Open Anyway**.
 
-A run needs about 3 GB of free memory (the browser holds the volumes and the network's 128^3
-patches).
+A run needs about 3 to 4 GB of free memory (the browser holds the volumes and the network's
+patches). A FLAIR-only run with the Raidionics model, whose patches are 160^3, peaked at about
+4 GB across all browser processes on the test machine.
 
 The executables are unsigned. Workstations that allow only approved software may block them
 until IT approves them.

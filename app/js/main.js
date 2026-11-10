@@ -185,7 +185,7 @@ function updateModelNote() {
   const md = curModel();
   const tta = $('#optTta');
   tta.disabled = md.tta === false;
-  $('#ttaNote').textContent = md.tta === false ? ' (not used by this model, as in its original software)' : '';
+  $('#ttaNote').textContent = md.tta === false ? 'Not used by this model, as in its original software.' : '';
   renderRoles();
   const comps = (md.compartments || []).map(c => (c.name.match(/\(([^)]*)\)\s*$/) || [])[1] || c.name).filter(Boolean);
   $('#modelNote').textContent = md.id === 'hdglio' || !md.id
