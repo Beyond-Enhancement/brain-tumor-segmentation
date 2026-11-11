@@ -12,7 +12,7 @@ same prepared images in one go and be compared, as volumes, Dice and an agreemen
 segmentations and the prepared inputs are saved as NIfTI. All processing happens on the computer
 it runs on.
 
-![Workbench (v1.1.1) running the TCGA-FG-6692 demo with HD-GLIO](docs/workbench.png)
+![Workbench (v1.3.0) running the TCGA-FG-6692 demo with HD-GLIO, both add-on models listed](docs/workbench.png)
 
 ## What it measures
 
@@ -99,7 +99,7 @@ admin rights are needed.
 
 **Add-on models.** To use an add-on model, download its `.btsmodel` file and put it in the same
 folder as the program (for example both in Downloads). It then appears under *Processing
-options > Segmentation model*. Alternatively open it with **Add model file** (for that session
+options > Segmentation models*. Alternatively open it with **Add model file** (for that session
 only). The add-ons are separate files because the program and the models together would exceed
 GitHub's 100 MB file limit. Each file is checked (format and checksum) before use.
 
