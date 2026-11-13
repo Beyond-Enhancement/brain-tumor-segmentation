@@ -6,6 +6,7 @@ and add-on file are unchanged, and the demo case gives the same result (checked 
 README screenshot). Section 6 covers v1.2.0 (2026-11-09): the Raidionics FLAIR add-on and
 runs with fewer than four sequences; HD-GLIO and the BraTS add-on were re-run and are unchanged.
 Section 7 covers v1.3.0 (2026-11-09): several models in one run, and their comparison.
+Section 8 covers v1.4.0 (2026-11-13): the Raidionics tumor core add-on.
 Test machine: Linux container, 2 CPU cores, 7 GB RAM, no GPU,
 headless Chrome. Unless stated otherwise the case is TCGA-FG-6692 (the built-in demo: 2D axial
 T1, T1c, T2, FLAIR, 0.9 x 0.9 x 5.5 mm).
@@ -329,6 +330,60 @@ launcher (both add-on files next to it) gave segmentations identical to run A fo
 models, with no request leaving the computer, in 13 min 47 s. All browser processes together
 peaked at 4.1 GB (resident memory sampled every 2 s), the same as the single-model Raidionics
 run in section 6, because each network is released before the next is loaded.
+
+## 8. Version 1.4.0: Raidionics tumor core add-on
+
+**Model.** `MRI_TumorCore`, folder `t1c`, network of fold 0, from
+`Raidionics-MRI_TumorCore-v13.zip` (Raidionics-models release v1.3.0-rc; md5
+680fb800c9bd2aa35a0177b4b355a86a, as in all three of the release's model lists). BSD 2-Clause.
+One input (T1c), one sigmoid output: the preoperative tumor core, defined by Bouget et al.
+(Front Neurol 2026) as enhancing tissue, necrosis and cysts. Its `pre_processing.ini` is the
+same configuration as the FLAIR model's apart from the class name, so the same JavaScript runs it;
+`build/export_models.py raidionics-core` checks this before exporting. After the exporter was
+shared between the two models, the FLAIR add-on exports byte for byte as before. Raidionics'
+pipeline for it is the same as for the FLAIR model: brain model, tumor core model, brain overlap
+refinement.
+
+**Implementation, original network (Node, onnxruntime-node, original fp32 `model.onnx`)**, same
+reference runner and comparison as section 6, brain masks from HD-BET:
+
+| Case (T1c) | T1c grid | Resampled grid (both) | Network input max abs diff | Probability max abs diff | Differing voxels | Volume cm3 |
+|---|---|---|---|---|---|---|
+| TCGA-FG-6692 (axial, 0.90 x 0.90 x 5.5 mm) | 256 x 224 x 26 | 178 x 212 x 164, 8 patches | 2.4e-7 | 3.0e-6 | 0 | 9.945 / 9.945 |
+| TCGA-DU-7294 (axial, 0.94 x 0.94 x 2.5 mm) | 256 x 256 x 68 | 158 x 208 x 161, 4 patches | 2.4e-7 | 1.6e-6 | 0 | 9.734 / 9.734 |
+
+On DU-7294 the brain overlap refinement removed 29 voxels (a small finding outside the brain
+mask), identically on both sides. With the shipped 16-bit weights, FG-6692 was still identical and
+DU-7294 differed at 2 voxels (Dice 0.99977).
+
+**Workbench (browser, WebAssembly, shipped add-on file):**
+
+| Case | Loaded, models | Workbench cm3 | raidionicsseg cm3 | Differing voxels | Dice |
+|---|---|---|---|---|---|
+| TCGA-DU-7294 | T1c only; tumor core | 9.743 | 9.734 | 4 of 4,456,448 | 0.99955 |
+| TCGA-FG-6692 | all four, registered to T1c; BraTS and tumor core | 9.967 | 9.945 | 5 of 1,490,944 | 0.99889 |
+
+The FG-6692 run also checked the new tumor core region of the comparison: BraTS (NCR + ET) vs
+Raidionics tumor core Dice 0.827 (both 7.99 cm3, BraTS only 1.36, Raidionics only 1.98), recomputed
+from the exported files by `check_model_comparison.py` (largest difference 0.0005 cm3), and the
+exported agreement map matched voxel for voxel. A run of HD-GLIO with the tumor core model, which
+share no region, showed both volume tables and the note that no overlap is computed.
+
+**What it labels in a non-enhancing glioma.** On DU-7294 the model finds 9.7 cm3 of tumor core,
+96% of it inside the Raidionics FLAIR lesion, with a median T1c intensity of 171 against 351 in the
+rest of the brain: it labels the T1-hypointense part of the tumor, in keeping with a definition
+that includes necrosis and cysts, not enhancement.
+
+**Single-sequence loading.** A lone NIfTI whose name does not reveal its sequence (DU-7294's
+T1c, saved as `20_SAG_MPR.nii.gz`) was not assigned to any sequence, so the run could not start.
+When the checked models need one sequence and exactly one series is unassigned, the page now
+assigns it, marked "only series left - check it". The DU-7294 run above loaded that file alone; it took
+4 min 35 s (HD-BET 3 min 20 s, Raidionics tumor core 1 min 15 s for 4 patches).
+
+**Executable.** The 1.4.0 Linux build, run through its own launcher with the three add-on files
+next to it (all three listed), gave the same DU-7294 T1c-only segmentation as the test server,
+voxel for voxel, with no request leaving the computer. The BraTS and Raidionics FLAIR add-on files
+built by 1.4.0 are byte-identical to the published ones.
 
 ## Run time
 

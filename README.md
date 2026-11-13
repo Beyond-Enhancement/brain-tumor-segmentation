@@ -232,8 +232,9 @@ augmentation on both sides, 22 voxels differ (Dice 0.9991 / 0.9965). The HD-BET 
 PyTorch network at 1 voxel (Dice 1.0 for ET, NCR and TC; 0.99991 for ED). The Raidionics FLAIR
 add-on, against the original raidionicsseg code on the same FLAIR and brain mask, differs at
 2 voxels on TCGA-DU-7294 (Dice 0.99993; 30.27 cm3 on both sides) and at 3 on TCGA-FG-6692
-(Dice 0.99972; 24.10 vs 24.09 cm3). The Raidionics tumor core add-on differs from raidionicsseg
-at RAIDCORE_SUMMARY.
+(Dice 0.99972; 24.10 vs 24.09 cm3). The Raidionics tumor core add-on, on the T1c with the same
+brain mask, differs from raidionicsseg at 4 voxels on TCGA-DU-7294 (Dice 0.99955; 9.74 vs 9.73 cm3)
+and at 5 on TCGA-FG-6692 (Dice 0.99889; 9.97 vs 9.95 cm3).
 
 **Weight precision.** HD-GLIO and HD-BET are stored as 8-bit integers per output channel and
 restored to 32-bit floating point at load, which keeps the executable under GitHub's 100 MB file
