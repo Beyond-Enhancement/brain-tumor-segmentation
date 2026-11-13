@@ -11,6 +11,7 @@ Usage:
   build/export_models.py hdbet  <hd-bet release folder (contains fold_all/)>
   build/export_models.py brats2020 <nnU-Net Task082 trainer folder> --out addons/brats2020
   build/export_models.py raidionics-flair <MRI_FLAIRChanges/t2f folder> --out addons/raidionics-flair
+  build/export_models.py raidionics-core <MRI_TumorCore/t1c folder> --out addons/raidionics-core
 """
 import argparse, json, os, sys, tempfile, hashlib
 import numpy as np
@@ -239,12 +240,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
 
-def export_raidionics_flair(folder, out_dir, q8, fold=0):
-    """Raidionics MRI_FLAIRChanges (t2f): FLAIR hyperintensity from FLAIR alone, one fold.
-    folder: the model's 't2f' folder from Raidionics-MRI_FLAIRChanges-v13.zip (Raidionics-models
-    release v1.3.0-rc), holding pre_processing.ini and one sub-folder per fold. The JavaScript
-    follows raidionicsseg 1.5.2 with the runtime settings the Raidionics app and raidionics_rads_lib
-    use (thresholding, resample_first, no overlap, no test-time augmentation, first fold only)."""
+def _raidionics_network(folder, out_dir, q8, fold, classes):
+    """Common part of the Raidionics v1.3 exports: read the model's pre_processing.ini, stop unless it is
+    exactly the configuration the JavaScript implements, and pack the weights of one fold.
+    folder: the model's sequence folder (e.g. 't2f', 't1c') holding pre_processing.ini and one
+    sub-folder per fold. The JavaScript follows raidionicsseg 1.5.2 with the runtime settings the
+    Raidionics app and raidionics_rads_lib use (thresholding, resample_first, no overlap, no
+    test-time augmentation, first fold only)."""
     import configparser
     ini = configparser.ConfigParser()
     ini.read(os.path.join(folder, 'pre_processing.ini'))
@@ -264,7 +266,7 @@ def export_raidionics_flair(folder, out_dir, q8, fold=0):
     expect = {'outputSpacing': [1.0, 1.0, 1.0], 'crop': 'minimum', 'clipPercentile': [0.0, 99.5], 'normalization': 'zeromean_nonzero',
               'patchSize': [160, 160, 160], 'patchOffset': [0, 0, 0], 'numClasses': 1, 'thresholds': [0.5], 'activation': 'sigmoid',
               'activationIncluded': False, 'channelsOrder': 'channels_first', 'backend': 'Torch', 'numberInputs': 1, 'swapInput': False,
-              'biasCorrection': False, 'classes': 'FLAIRChanges'}
+              'biasCorrection': False, 'classes': classes}
     assert pre == expect, {k: (pre[k], expect[k]) for k in expect if pre[k] != expect[k]}
     src = os.path.join(folder, str(fold), 'model.onnx')
     m = onnx.load(src, load_external_data=False)
@@ -272,6 +274,17 @@ def export_raidionics_flair(folder, out_dir, q8, fold=0):
     assert [i.name for i in ins] == ['input'] and [d.dim_value for d in ins[0].type.tensor_type.shape.dim] == [1, 1, 160, 160, 160]
     assert [d.dim_value for d in m.graph.output[0].type.tensor_type.shape.dim] == [1, 1, 160, 160, 160]
     w = pack_weights(src, out_dir, q8, small_f32=True)
+    return pre, w
+
+
+RAIDIONICS_CITATION = ('Bouget D, et al. Raidionics: an open software for pre- and postoperative central nervous system tumor '
+                       'segmentation and standardized reporting. Sci Rep 2023;13. doi:10.1038/s41598-023-42048-7.')
+
+
+def export_raidionics_flair(folder, out_dir, q8, fold=0):
+    """Raidionics MRI_FLAIRChanges (t2f): FLAIR hyperintensity from FLAIR alone, one fold.
+    folder: the 't2f' folder from Raidionics-MRI_FLAIRChanges-v13.zip (Raidionics-models v1.3.0-rc)."""
+    pre, w = _raidionics_network(folder, out_dir, q8, fold, 'FLAIRChanges')
     return {
         'id': 'raidionics-flair', 'addonFormat': 1, 'kind': 'raidionics', 'short': 'Raidionics FLAIR',
         'name': 'Raidionics FLAIR hyperintensity',
@@ -285,9 +298,32 @@ def export_raidionics_flair(folder, out_dir, q8, fold=0):
         'compartments': [{'key': 'flair', 'name': 'FLAIR hyperintensity (tumor and edema)', 'labels': [1]}],
         'tableNote': 'One class: the whole FLAIR hyperintensity. Enhancing tumor, necrosis and edema are not separated.',
         'citation': ('Faanes MG, Bouget D, Jakola AS, et al. A unified FLAIR hyperintensity segmentation model for various CNS tumor '
-                     'types and acquisition time points. Sci Rep 2026;16:19707. doi:10.1038/s41598-026-48496-1. '
-                     'Bouget D, et al. Raidionics: an open software for pre- and postoperative central nervous system tumor '
-                     'segmentation and standardized reporting. Sci Rep 2023;13. doi:10.1038/s41598-023-42048-7.'),
+                     'types and acquisition time points. Sci Rep 2026;16:19707. doi:10.1038/s41598-026-48496-1. ' + RAIDIONICS_CITATION),
+        'license': 'BSD 2-Clause (Copyright (c) 2023, David Bouget)', 'licenseText': RAIDIONICS_LICENSE,
+        'sourceUrl': 'https://github.com/raidionics/Raidionics-models/releases/tag/v1.3.0-rc',
+    }
+
+
+def export_raidionics_core(folder, out_dir, q8, fold=0):
+    """Raidionics MRI_TumorCore (t1c): preoperative contrast-enhancing tumor core (enhancing tissue,
+    necrosis and cysts) of gliomas, meningiomas and metastases from T1c alone, one fold.
+    folder: the 't1c' folder from Raidionics-MRI_TumorCore-v13.zip (Raidionics-models v1.3.0-rc)."""
+    pre, w = _raidionics_network(folder, out_dir, q8, fold, 'Tumor')
+    return {
+        'id': 'raidionics-core', 'addonFormat': 1, 'kind': 'raidionics', 'short': 'Raidionics core',
+        'name': 'Raidionics tumor core',
+        'version': 'MRI_TumorCore (t1c), network of fold %d, Raidionics-models v1.3.0-rc' % fold, 'fold': fold,
+        'trainer': 'Attention U-Net, PyTorch; preprocessing and inference as raidionicsseg 1.5.2',
+        'inputChannels': ['T1c'], 'tta': False,
+        'raidionics': {**pre, 'overlapRatio': 0.0, 'reconstruction': 'thresholding', 'reconstructionOrder': 'resample_first',
+                       'refinement': 'brain_overlap'},
+        'onnx': 'model.onnx', 'weights': w,
+        'labels': [{'value': 1, 'name': 'Tumor core', 'short': 'Core', 'color': [255, 77, 77]}],
+        'compartments': [{'key': 'core', 'name': 'Tumor core (enhancing tissue, necrosis, cysts)', 'labels': [1]}],
+        'tableNote': ('One class: the contrast-enhancing tumor core, with necrosis and cysts, for gliomas, meningiomas and '
+                      'metastases. Edema is not included; the Raidionics FLAIR model gives the FLAIR hyperintensity.'),
+        'citation': ('Bouget D, et al. Automatic and standardized reporting of perioperative MRIs in patients with central nervous '
+                     'system tumors. Front Neurol 2026;16. doi:10.3389/fneur.2025.1707481. ' + RAIDIONICS_CITATION),
         'license': 'BSD 2-Clause (Copyright (c) 2023, David Bouget)', 'licenseText': RAIDIONICS_LICENSE,
         'sourceUrl': 'https://github.com/raidionics/Raidionics-models/releases/tag/v1.3.0-rc',
     }
@@ -334,7 +370,7 @@ def export_hdbet(folder, out_dir, q8):
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
-    ap.add_argument('model', choices=['hdglio', 'hdbet', 'brats2020', 'raidionics-flair'])
+    ap.add_argument('model', choices=['hdglio', 'hdbet', 'brats2020', 'raidionics-flair', 'raidionics-core'])
     ap.add_argument('folder')
     ap.add_argument('--q8', action='store_true', help='int8 weights (smaller, slightly less exact)')
     ap.add_argument('--out', default=None)
@@ -342,7 +378,7 @@ if __name__ == '__main__':
     out_dir = a.out or os.path.join(OUT, a.model)
     os.makedirs(out_dir, exist_ok=True)
     cfg = {'hdglio': export_hdglio, 'hdbet': export_hdbet, 'brats2020': export_brats2020,
-           'raidionics-flair': export_raidionics_flair}[a.model](a.folder, out_dir, a.q8)
+           'raidionics-flair': export_raidionics_flair, 'raidionics-core': export_raidionics_core}[a.model](a.folder, out_dir, a.q8)
     json.dump(cfg, open(os.path.join(out_dir, 'config.json'), 'w'), indent=1)
     sz = sum(os.path.getsize(os.path.join(out_dir, f)) for f in os.listdir(out_dir))
     print(a.model, 'exported to', out_dir, '(%.1f MB)' % (sz / 1e6))

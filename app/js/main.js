@@ -110,8 +110,21 @@ function onSeries(m) {
   ui.assignment = {};
   for (const r of ROLES) if (m.guess[r]) ui.assignment[r] = m.guess[r];
   ui.inferred = m.inferred ? { role: m.inferred, id: m.guess[m.inferred] } : null;
+  autoAssignSingle();
   renderRoles();
   if (ui.caseLabel) $('#caseLabel').textContent = ui.caseLabel;
+}
+
+// The checked models need one sequence only, it is not assigned, and exactly one series is
+// unassigned: assign that series to it (marked for checking), as for the fourth by elimination.
+function autoAssignSingle() {
+  const req = requiredRoles();
+  if (req.length !== 1 || ui.assignment[req[0]]) return;
+  const used = new Set(Object.values(ui.assignment).filter(Boolean));
+  const free = ui.series.filter(x => !used.has(x.id));
+  if (free.length !== 1) return;
+  ui.assignment[req[0]] = free[0].id;
+  ui.inferred = { role: req[0], id: free[0].id, single: true };
 }
 
 function seriesMeta(s) {
@@ -153,9 +166,10 @@ function renderRoles() {
     meta.className = 'meta';
     const s = ui.series.find(x => x.id === ui.assignment[r]);
     const byElim = ui.inferred && ui.inferred.role === r && ui.inferred.id === ui.assignment[r];
-    meta.textContent = (byElim ? 'by elimination - check it.  ' : '') + seriesMeta(s);
+    meta.textContent = (byElim ? (ui.inferred.single ? 'only series left - check it.  ' : 'by elimination - check it.  ') : '') + seriesMeta(s);
     if (byElim) meta.classList.add('elim');
-    meta.title = byElim ? 'The other three sequences were recognised and this was the only series left, so it was assigned here.' : meta.textContent;
+    meta.title = byElim ? (ui.inferred.single ? 'The selected models need only ' + r + ' and this was the only series not assigned, so it was assigned here.'
+      : 'The other three sequences were recognised and this was the only series left, so it was assigned here.') : meta.textContent;
     row.innerHTML = `<span class="tag" title="${ROLE_NAMES[r]}${req.includes(r) ? '' : ' (optional for the selected models)'}">${r}</span>`;
     row.appendChild(sel); row.appendChild(meta);
     box.appendChild(row);
@@ -186,6 +200,7 @@ const MODEL_BLURB = {
   hdglio: 'Contrast-enhancing tumor and non-enhancing T2/FLAIR abnormality. T1, T1c, T2, FLAIR.',
   brats2020: 'Enhancing tumor, necrosis, edema (BraTS labels). T1, T1c, T2, FLAIR.',
   'raidionics-flair': 'FLAIR hyperintensity (tumor and edema). FLAIR only.',
+  'raidionics-core': 'Tumor core: enhancing tissue, necrosis, cysts; gliomas, meningiomas, metastases. T1c only.',
 };
 function modelInfo(md) {
   if (md.id === 'hdglio') return 'HD-GLIO (Kickingereder et al. 2019): contrast-enhancing tumor and non-enhancing T2/FLAIR abnormality; no necrosis class. Built in.';
@@ -225,6 +240,7 @@ function updateModelNote() {
   $('#ttaNote').textContent = !ttaUsers.length ? 'Not used by ' + (ms.length > 1 ? 'these models' : 'this model') + ', as in ' + (ms.length > 1 ? 'their' : 'its') + ' original software.'
     : ttaUsers.length < ms.length ? 'Applies to ' + ttaUsers.map(shortName).join(' and ') + ' only.' : '';
   if (!ui.running) ui.runModels = null;
+  if (ui.series.length) autoAssignSingle();
   renderRoles();
   $('#modelNote').textContent = !ms.length ? 'Check at least one model.'
     : ms.length === 1 ? (ms[0].id === 'hdglio' ? 'Check more than one model to run them on the same prepared images and compare the results.' : modelInfo(ms[0]))
@@ -481,7 +497,8 @@ async function onResult(m) {
   images.brain.setColormapLabel({ R: [0, 90], G: [0, 200], B: [0, 255], A: [0, 120], I: [0, 1], labels: ['', 'brain'] });
   for (const md of m.models) images['seg:' + md.id] = await makeImage(m.vols['seg:' + md.id], 'seg.nii', { opacity: +$('#opacity').value });
   ui.overlay = 'seg:' + m.models[0].id;
-  ui.cmpPair = m.models.length > 1 ? [m.models[0].id, m.models[1].id] : null;
+  // default comparison: the first pair of models that shares a region
+  ui.cmpPair = m.compare && m.compare.pairs.length ? [m.compare.pairs[0].a, m.compare.pairs[0].b] : null;
   const sel = $('#bgSel');
   sel.innerHTML = m.roles.map(r => `<option value="${r}">${r === m.refRole ? r + ' (reference)' : r + ' (registered)'}</option>`).join('');
   const allIn = m.models.flatMap(md => md.inputs);
@@ -563,15 +580,23 @@ function renderVolumes() {
 // of models in the chosen region; the chosen pair can be shown as an agreement map on the viewer.
 function renderComparison() {
   const m = ui.result, C = m.compare;
-  const show = m.models.length > 1 && C && C.pairs.length;
+  const show = m.models.length > 1 && C;
   $('#cmpSection').hidden = !show;
   if (!show) return;
   const regs = C.regions;
+  // models that share no region: volumes only, no overlap
+  const shared = C.pairs.length > 0;
+  $('#cmpPairs').hidden = !shared;
   $('#cmpVolTable thead').innerHTML = `<tr><th>Model</th>${regs.map(r => `<th class="num" title="${esc(r.name)}">${esc(r.short)}</th>`).join('')}</tr>`;
   $('#cmpVolTable tbody').innerHTML = m.models.map(md => {
     const v = C.volumes.find(x => x.id === md.id).regions;
     return `<tr><td>${esc(shortName(md))}</td>${regs.map(r => (v[r.key] ? `<td class="num">${fmtVol(v[r.key].cm3)}</td>` : '<td class="num na">-</td>')).join('')}</tr>`;
   }).join('');
+  if (!shared) {
+    $('#cmpNote').textContent = 'These models share no region, so no overlap is computed. ' + m.models.map(md => shortName(md) + ': ' + Object.keys(C.volumes.find(x => x.id === md.id).regions).map(k => (regs.find(r => r.key === k) || { name: k }).name.toLowerCase()).join(', ')).join('; ') + '.';
+    renderLegend();
+    return;
+  }
   const rsel = $('#cmpRegion');
   const comparable = regs.filter(r => r.comparable);
   const keep = rsel.value;
@@ -582,7 +607,7 @@ function renderComparison() {
   pickA.innerHTML = opts; pickB.innerHTML = opts;
   pickA.value = ui.cmpPair[0]; pickB.value = ui.cmpPair[1];
   renderPairs();
-  const defs = { whole: 'Whole abnormality: all labels of each model', enh: 'Enhancing tumor: HD-GLIO contrast-enhancing, BraTS ET', nonenh: 'Non-enhancing abnormality: whole minus enhancing (HD-GLIO non-enhancing, BraTS NCR + ED)' };
+  const defs = { whole: 'Whole abnormality: all labels of each model', core: 'Tumor core: BraTS NCR + ET, Raidionics tumor core (enhancing tissue, necrosis, cysts); HD-GLIO is not included, as its labels do not say where necrosis goes', enh: 'Enhancing tumor: HD-GLIO contrast-enhancing, BraTS ET', nonenh: 'Non-enhancing abnormality: whole minus enhancing (HD-GLIO non-enhancing, BraTS NCR + ED)' };
   $('#cmpNote').textContent = regs.map(r => defs[r.key] || r.name).join('. ') + '. Regions a model does not have are left out of its comparisons.';
   renderLegend();
 }
@@ -665,7 +690,7 @@ function renderExports() {
     box.insertBefore(b, first);
   }
   const ag = box.querySelector('[data-exp="agree"]');
-  ag.hidden = m.models.length < 2; ag.disabled = m.models.length < 2;
+  ag.hidden = !ui.cmpPair; ag.disabled = !ui.cmpPair;
   ag.title = 'The agreement map of the two models and region chosen under Model comparison';
   for (const b of $$('[data-exp]')) {
     const r = b.dataset.exp.startsWith('input:') ? b.dataset.exp.slice(6) : null;

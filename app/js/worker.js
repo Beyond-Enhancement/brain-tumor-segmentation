@@ -233,13 +233,17 @@ const npSpacing = aff => { const s = G.spacing(aff); return [s[2], s[1], s[0]]; 
 // compartments stay as they are; these are only used for the comparison table and maps.
 const REGION_DEFS = [
   { key: 'whole', name: 'Whole abnormality', short: 'Whole' },
+  { key: 'core', name: 'Tumor core', short: 'Core' },
   { key: 'enh', name: 'Enhancing tumor', short: 'Enh.' },
   { key: 'nonenh', name: 'Non-enhancing abnormality', short: 'Non-enh.' },
 ];
 const MODEL_REGIONS = {
   hdglio: { whole: [1, 2], enh: [2], nonenh: [1] },
-  brats2020: { whole: [1, 2, 4], enh: [4], nonenh: [1, 2] },
+  brats2020: { whole: [1, 2, 4], core: [1, 4], enh: [4], nonenh: [1, 2] },
   'raidionics-flair': { whole: [1] },
+  // enhancing tissue, necrosis and cysts (Bouget et al. 2026), as BraTS tumor core = NCR + ET.
+  // HD-GLIO is left out: its labels do not say where necrosis goes.
+  'raidionics-core': { core: [1] },
 };
 const regionsFor = cfg => cfg.compareRegions || MODEL_REGIONS[cfg.id] || { whole: cfg.labels.map(l => l.value) };
 const labelLut = labels => { const t = new Uint8Array(256); for (const l of labels) t[l] = 1; return t; };

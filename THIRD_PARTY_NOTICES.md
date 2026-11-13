@@ -10,6 +10,7 @@ repositories and records linked here.
 | HD-GLIO v2 network parameters | Kickingereder P, Isensee F. Zenodo [10.5281/zenodo.4014850](https://doi.org/10.5281/zenodo.4014850) (`hd_glio_v2_params.zip`, md5 65704898365b11630887389a90c10122) | CC BY 4.0 | `app/models/hdglio/`, converted to ONNX |
 | nnU-Net BraTS 2020 parameters (add-on, not in the executables) | Isensee F. Zenodo [10.5281/zenodo.4635763](https://doi.org/10.5281/zenodo.4635763) (`Task082_nnUNetTrainerV2BraTSRegions_DA4_BN_BD__nnUNetPlansv2.1_bs5_5fold.zip`, md5 b6c771f4921f0a62852e842e4b91d6d0; fold 0 used) | CC BY 4.0 | `downloads/*-BraTS2020-nnUNet.btsmodel`, converted to ONNX (16-bit weights) |
 | Raidionics MRI_FLAIRChanges parameters, `t2f` network of fold 0 (add-on, not in the executables) | Bouget D, Faanes MG, et al. [Raidionics-models release v1.3.0-rc](https://github.com/raidionics/Raidionics-models/releases/tag/v1.3.0-rc) (`Raidionics-MRI_FLAIRChanges-v13.zip`, md5 ec6209b06af8cb226bff50d8890eed24, as in the release's model list) | BSD 2-Clause, Copyright (c) 2023, David Bouget (text below and inside the add-on file) | `addons/raidionics-flair/`, converted to ONNX with 16-bit weights, packaged as `BrainTumorSegmentationWorkbench-model-Raidionics-FLAIR.btsmodel` |
+| Raidionics MRI_TumorCore parameters, `t1c` network of fold 0 (add-on, not in the executables) | Bouget D, et al. [Raidionics-models release v1.3.0-rc](https://github.com/raidionics/Raidionics-models/releases/tag/v1.3.0-rc) (`Raidionics-MRI_TumorCore-v13.zip`, md5 680fb800c9bd2aa35a0177b4b355a86a, as in the release's model lists) | BSD 2-Clause, Copyright (c) 2023, David Bouget (text below and inside the add-on file) | `addons/raidionics-core/`, converted to ONNX with 16-bit weights, packaged as `BrainTumorSegmentationWorkbench-model-Raidionics-TumorCore.btsmodel` |
 | HD-BET v1.5 parameters (HD-BET 2.0 package) | Isensee F, Schell M, Tursunova I, et al. Zenodo [10.5281/zenodo.14445620](https://doi.org/10.5281/zenodo.14445620) (`release_v1.5.0.zip`, md5 f97a36f89f8eb3071ff05c6f9ac66b56) | **CC BY-NC 4.0 (non-commercial)** | `app/models/hdbet/`, converted to ONNX |
 
 The networks were converted with `build/export_models.py`. The weights are stored at reduced
@@ -28,6 +29,9 @@ Please cite when using results:
   (BrainLes 2020). LNCS 12659. Springer; 2021:118-132. (BraTS 2020 add-on model)
 - Isensee F, Jaeger PF, Kohl SAA, Petersen J, Maier-Hein KH. nnU-Net: a self-configuring method
   for deep learning-based biomedical image segmentation. Nat Methods. 2021;18(2):203-211.
+- Bouget D, et al. Automatic and standardized reporting of perioperative MRIs in patients with
+  central nervous system tumors. Front Neurol. 2026;16. doi:10.3389/fneur.2025.1707481
+  (Raidionics tumor core add-on model)
 - Faanes MG, Bouget D, Jakola AS, et al. A unified FLAIR hyperintensity segmentation model for
   various CNS tumor types and acquisition time points. Sci Rep. 2026;16:19707.
   doi:10.1038/s41598-026-48496-1 (Raidionics FLAIR add-on model)
@@ -47,7 +51,7 @@ refinement of raidionics_rads_lib 1.3.3
 
 ### License of the Raidionics network parameters
 
-The Raidionics add-on file redistributes network parameters from Raidionics-models under this
+The Raidionics add-on files redistribute network parameters from Raidionics-models under this
 license (the same text is in the `README.txt` inside the add-on file):
 
 ```

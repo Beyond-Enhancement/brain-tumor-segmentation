@@ -15,10 +15,11 @@ D = sys.argv[1]
 same = dict(a.split('=', 1) for a in sys.argv[sys.argv.index('--same') + 1:]) if '--same' in sys.argv else {}
 REGIONS = {  # app/js/worker.js MODEL_REGIONS
     'hdglio': {'whole': [1, 2], 'enh': [2], 'nonenh': [1]},
-    'brats2020': {'whole': [1, 2, 4], 'enh': [4], 'nonenh': [1, 2]},
+    'brats2020': {'whole': [1, 2, 4], 'core': [1, 4], 'enh': [4], 'nonenh': [1, 2]},
     'raidionics-flair': {'whole': [1]},
+    'raidionics-core': {'core': [1]},
 }
-NAMES = {'Whole abnormality': 'whole', 'Enhancing tumor': 'enh', 'Non-enhancing abnormality': 'nonenh'}
+NAMES = {'Whole abnormality': 'whole', 'Tumor core': 'core', 'Enhancing tumor': 'enh', 'Non-enhancing abnormality': 'nonenh'}
 
 rows = [r for r in csv.reader(open(os.path.join(D, 'model_comparison_volumes.csv'))) if r and not r[0].startswith('#')]
 head, rows = rows[0], [dict(zip(rows[0], r)) for r in rows[1:]]
@@ -51,7 +52,7 @@ for r in rows:
             worst['overlap'] = max(worst['overlap'], abs(x * vv - float(r[c])))
         print('%-16s vs %-16s %-9s Dice %.4f  both %.3f  first only %.3f  second only %.3f cm3' % (r['model'], r['model_b'], k, dice or 0, both * vv, ao * vv, bo * vv))
 for f in glob.glob(os.path.join(D, 'agreement_*_vs_*_*.nii.gz')):
-    m = re.match(r'agreement_(.+)_vs_(.+)_(whole|enh|nonenh)\.nii\.gz$', os.path.basename(f))
+    m = re.match(r'agreement_(.+)_vs_(.+)_(whole|core|enh|nonenh)\.nii\.gz$', os.path.basename(f))
     a, b, k = m.groups()
     want = np.isin(segs[a], REGIONS[a][k]).astype(np.int32) + 2 * np.isin(segs[b], REGIONS[b][k]).astype(np.int32)
     got = np.asarray(nib.load(f).dataobj).astype(np.int32)

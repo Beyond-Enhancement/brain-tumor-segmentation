@@ -78,11 +78,14 @@ if (!errToast.length && !(await page.$eval('#cmpSection', e => e.hidden))) {
     await page.selectOption('#cmpRegion', r);
     cmp.pairs[r] = await rowsOf('#cmpPairTable tbody');
   }
-  await page.selectOption('#cmpRegion', 'whole');
-  await page.click('#cmpShow');
-  await page.waitForFunction(() => document.querySelector('#segSel').value === 'cmp', null, { timeout: 30000 });
-  await page.waitForTimeout(2500);
-  await page.screenshot({ path: path.join(out, '2-agreement.png') });
+  const regs = await page.$$eval('#cmpRegion option', o => o.map(x => x.value));
+  if (regs.length) {
+    await page.selectOption('#cmpRegion', regs[0]);
+    await page.click('#cmpShow');
+    await page.waitForFunction(() => document.querySelector('#segSel').value === 'cmp', null, { timeout: 30000 });
+    await page.waitForTimeout(2500);
+    await page.screenshot({ path: path.join(out, '2-agreement.png') });
+  }
   cmp.legend = await page.$eval('#cmpLegend', e => e.innerText.replace(/\s+/g, ' '));
 }
 // exports

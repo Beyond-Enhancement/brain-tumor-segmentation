@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reference run of the original Raidionics code for the workbench's Raidionics FLAIR add-on.
+"""Reference run of the original Raidionics code for the workbench's Raidionics add-ons (FLAIR, tumor core).
 
 Runs raidionicsseg (1.5.2, pip package) fit.run_model on one FLAIR image with the runtime settings
 that the Raidionics app passes through raidionics_rads_lib (gpu -1, batch 1, overlapping_ratio 0,
@@ -7,9 +7,9 @@ reconstruction thresholding / resample_first, no stripped data, folds_ensembling
 test-time augmentation), then raidionics_rads_lib's perform_brain_overlap_refinement (copied
 below, from raidionicsrads/Processing/brain_processing.py) with the given brain mask.
 
-Usage: raidionics_reference.py <FLAIR .nii.gz> <brain mask .nii.gz> <model folder (t2f)> <out dir>
+Usage: raidionics_reference.py <input .nii.gz> <brain mask .nii.gz> <model folder (t2f or t1c)> <out dir>
                                [--onnx FILE]   run this network file instead of <model>/0/model.onnx
-Writes <out>/labels_FLAIRChanges.nii.gz (thresholded, before refinement), <out>/ref_seg.nii.gz
+Writes <out>/labels_<class>.nii.gz (thresholded, before refinement), <out>/ref_seg.nii.gz
 (after refinement), <out>/ref_pre.npy (network input, X,Y,Z) and <out>/ref_prob.npy (sigmoid
 output on the resampled grid)."""
 import os, sys, shutil, configparser, tempfile
@@ -53,8 +53,12 @@ def pred(*a, **k):
     return r
 fit.prepare_pre_processing, fit.run_predictions = pre, pred
 fit.run_model(cfg_file)
-labels = os.path.join(work, 'outputs', 'labels_FLAIRChanges.nii.gz')
-shutil.copyfile(labels, os.path.join(out, 'labels_FLAIRChanges.nii.gz'))
+import glob
+found = glob.glob(os.path.join(work, 'outputs', 'labels_*.nii.gz'))
+assert len(found) == 1, found
+labels = found[0]
+labels_out = os.path.join(out, os.path.basename(labels))
+shutil.copyfile(labels, labels_out)
 
 
 def perform_brain_overlap_refinement(predictions_filepath, brain_mask_filepath):
@@ -83,7 +87,7 @@ refined = os.path.join(out, 'ref_seg.nii.gz')
 shutil.copyfile(labels, refined)
 perform_brain_overlap_refinement(refined, mask)
 shutil.rmtree(work)
-a = nib.load(os.path.join(out, 'labels_FLAIRChanges.nii.gz')).get_fdata() > 0
+a = nib.load(labels_out).get_fdata() > 0
 b = nib.load(refined).get_fdata() > 0
 vv = float(np.prod(nib.load(refined).header.get_zooms()[:3])) / 1000
 print('raidionicsseg: %d voxels (%.3f cm3) thresholded, %d (%.3f cm3) after brain overlap refinement' % (a.sum(), a.sum() * vv, b.sum(), b.sum() * vv))
