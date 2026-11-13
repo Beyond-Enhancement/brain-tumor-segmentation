@@ -7,7 +7,9 @@
 // images on a 1 mm grid with the BraTS axis order (i to the patient's left, j to posterior, k to
 // superior), 240 x 240 x 155 voxels (larger if the brain needs it) centred on the brain. When
 // the run grid is already 1 mm and axis-aligned, that grid is placed on the run grid's voxels,
-// so the images are copied without interpolation; otherwise they are resampled linearly. The
+// so the images are copied without interpolation (and when the run grid is itself such a
+// 240 x 240 x 155 box, as BraTS-style images are, it is used as it is); otherwise they are
+// resampled linearly. The
 // probabilities are resampled linearly back to the run grid and thresholded there.
 //
 // Steps as brainles_aurora: per channel, intensities scaled from the 0.5th..99.5th percentile to
@@ -26,7 +28,7 @@ import { mul4, inv4 } from './geom.js';
 
 const AXES = { LPS: [[-1, 0, 0], [0, -1, 0], [0, 0, 1]] }; // world direction of internal axes i, j, k
 
-// The internal grid: { dims, affine, snapped }
+// The internal grid: { dims, affine, snapped (on the run grid's voxels), sameFrame (the run grid's own box) }
 export function auroraGrid(grid, brain, P) {
   const [nx, ny, nz] = grid.dims, A = grid.affine;
   let x0 = nx, y0 = ny, z0 = nz, x1 = -1, y1 = -1, z1 = -1;
@@ -58,11 +60,29 @@ export function auroraGrid(grid, brain, P) {
     }
     if (n !== 1) snapped = false;
   }
-  if (snapped) for (let r = 0; r < 3; r++) { const s = sp[wAx.indexOf(r)]; origin[r] = A[4 * r + 3] + s * Math.round((origin[r] - A[4 * r + 3]) / s); }
+  let sameFrame = false;
+  if (snapped) {
+    for (let r = 0; r < 3; r++) { const s = sp[wAx.indexOf(r)]; origin[r] = A[4 * r + 3] + s * Math.round((origin[r] - A[4 * r + 3]) / s); }
+    // a reference that already is a BraTS-style frame (as many voxels along each axis as the grid,
+    // e.g. 240 x 240 x 155 at 1 mm): use that frame as it is, so that AURORA sees the image exactly
+    // as its own code would (the sliding windows then fall on the same voxels)
+    const ext = [0, 1, 2].map(r => {
+      let a = Infinity, b = -Infinity;
+      for (const i of [0, nx - 1]) for (const j of [0, ny - 1]) for (const k of [0, nz - 1]) {
+        const w = i * A[4 * r] + j * A[4 * r + 1] + k * A[4 * r + 2] + A[4 * r + 3];
+        if (w < a) a = w; if (w > b) b = w;
+      }
+      return [a, b];
+    });
+    if ([0, 1, 2].every(a => Math.round((ext[wAx[a]][1] - ext[wAx[a]][0]) / sp[a]) + 1 === dims[a])) {
+      for (let a = 0; a < 3; a++) { const r = wAx[a]; origin[r] = D[a][r] < 0 ? ext[r][1] : ext[r][0]; }
+      sameFrame = true;
+    }
+  }
   const affine = new Float64Array(16);
   for (let r = 0; r < 3; r++) { for (let a = 0; a < 3; a++) affine[4 * r + a] = D[a][r] * sp[a]; affine[4 * r + 3] = origin[r]; }
   affine[15] = 1;
-  return { dims, affine, snapped };
+  return { dims, affine, snapped, sameFrame };
 }
 
 const snap = c => { const r = Math.round(c); return Math.abs(c - r) < 1e-6 ? r : c; };
@@ -265,5 +285,5 @@ export async function predictAurora(vols, grid, brain, cfg, runPatch, opts = {})
     }
   }
   onProgress('post', 1);
-  return { seg, info: { grid: G.dims, snapped: G.snapped, windows: wins.length, passes: passes.length, percentiles: pct, brainOutsideGrid: nOut } };
+  return { seg, info: { grid: G.dims, snapped: G.snapped, sameFrame: G.sameFrame, windows: wins.length, passes: passes.length, percentiles: pct, brainOutsideGrid: nOut } };
 }

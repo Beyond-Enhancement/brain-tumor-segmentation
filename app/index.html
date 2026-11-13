@@ -53,6 +53,7 @@
           <option value="T1" selected>T1 (as published)</option>
           <option value="T1c">T1c</option>
           <option value="FLAIR">FLAIR</option>
+          <option value="T2">T2</option>
         </select>
       </label>
       <label class="field">Grid
@@ -62,7 +63,7 @@
         </select>
       </label>
       <p class="muted small" id="refNote"></p>
-      <label class="check"><input type="checkbox" id="optBet" checked> <span><span id="betLabel">Brain extraction with HD-BET on T1.</span> Uncheck if the inputs are already skull-stripped.</span></label>
+      <label class="check"><input type="checkbox" id="optBet" checked> <span><span id="betLabel">Brain extraction with HD-BET on T1.</span> <span id="betHint">Uncheck if the inputs are already skull-stripped.</span></span></label>
       <label class="check"><input type="checkbox" id="optReg" checked> <span><span id="regLabel">Rigid registration of T1c, T2 and FLAIR to T1.</span> Uncheck if they are already co-registered on one grid.</span></label>
       <label class="check"><input type="checkbox" id="optTta"> <span>Test-time augmentation: 8 mirrored passes, as in the published HD-GLIO. About 8 times slower. <span id="ttaNote"></span></span></label>
       <label class="field">Compute
@@ -144,7 +145,7 @@
       <h2>About</h2>
       <p class="small">Segmentation by <b>HD-GLIO</b> (Kickingereder, Isensee et al., Lancet Oncol 2019) with brain extraction by <b>HD-BET</b> (Isensee et al., Hum Brain Mapp 2019), both from Heidelberg University Hospital and DKFZ, run here with ONNX Runtime. Preprocessing follows the HD-GLIO instructions: reorientation to standard, HD-BET brain mask, 6-parameter registration to T1, masking.</p>
       <p class="small muted">Network weights are stored as 8-bit integers per output channel and restored to 32-bit at load. On the demo case this changed fewer than 0.01% of voxels against the original PyTorch models (see VERIFICATION.md). HD-GLIO weights: CC BY 4.0. HD-BET weights: CC BY-NC 4.0, non-commercial use only.</p>
-      <p class="small muted">Optional add-on model files: nnU-Net BraTS 2020 (Isensee et al. 2021), Raidionics FLAIR hyperintensity (Faanes, Bouget et al. 2026) and Raidionics tumor core (Bouget et al. 2026), each run with its own published preprocessing; see the README.</p>
+      <p class="small muted">Optional add-on model files: nnU-Net BraTS 2020 (Isensee et al. 2021), Raidionics FLAIR hyperintensity (Faanes, Bouget et al. 2026), Raidionics tumor core (Bouget et al. 2026), AURORA brain metastases (Buchner et al. 2023) and vestibular schwannoma (Kujawa et al. 2024), each run with its own published preprocessing; see the README.</p>
       <p class="small warn">Research software, not a medical device. Not for clinical decision-making.</p>
     </section>
   </aside>

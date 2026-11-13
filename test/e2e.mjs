@@ -1,6 +1,6 @@
 // End-to-end test of the page in headless Chrome.
 //   node test/e2e.mjs <base url> <out dir> [--dicom DIR | --files a.nii.gz,b.nii.gz] [--model ID[,ID...]] [--ref T1c|FLAIR]
-//                     [--grid iso] [--webgpu] [--tta] [--timeout ms]
+//                     [--grid iso] [--webgpu] [--tta] [--no-bet] [--timeout ms]
 // Loads the built-in demo case (or a DICOM folder, or NIfTI files), runs the pipeline, checks the
 // volume table, exports every available NIfTI, and saves screenshots. Prints a JSON summary.
 import { chromium } from '/opt/npm-tools/node_modules/playwright/index.mjs';
@@ -50,6 +50,7 @@ await page.waitForFunction(n => [...document.querySelectorAll('#roles select')].
 await page.waitForFunction(() => !document.querySelector('#runBtn').disabled, null, { timeout: 30000 });
 const roles = await page.$$eval('#roles .role', rows => rows.map(r => r.querySelector('.tag').textContent + ' = ' + r.querySelector('select').selectedOptions[0].textContent));
 if (tta) await page.check('#optTta');
+if (process.argv.includes('--no-bet')) await page.uncheck('#optBet');
 const refArg = arg('--ref');
 if (refArg) await page.selectOption('#optRefSeq', refArg);
 if (arg('--grid')) await page.selectOption('#optGrid', arg('--grid'));

@@ -18,12 +18,15 @@ REGIONS = {  # app/js/worker.js MODEL_REGIONS
     'brats2020': {'whole': [1, 2, 4], 'core': [1, 4], 'enh': [4], 'nonenh': [1, 2]},
     'raidionics-flair': {'whole': [1]},
     'raidionics-core': {'core': [1]},
+    # add-ons that give their regions in config.json (compareRegions)
+    'vs-t1c': {'whole': [1]}, 'vs-t2': {'whole': [1]},
+    'aurora-t1c': {'whole': [1, 2], 'core': [2]}, 'aurora-t1c-flair': {'whole': [1, 2], 'core': [2]},
 }
 NAMES = {'Whole abnormality': 'whole', 'Tumor core': 'core', 'Enhancing tumor': 'enh', 'Non-enhancing abnormality': 'nonenh'}
 
 rows = [r for r in csv.reader(open(os.path.join(D, 'model_comparison_volumes.csv'))) if r and not r[0].startswith('#')]
 head, rows = rows[0], [dict(zip(rows[0], r)) for r in rows[1:]]
-ids = list(dict.fromkeys(r['model'] for r in rows if r['table'] == 'volume' and r['model'] != 'hdbet'))
+ids = list(dict.fromkeys(r['model'] for r in rows if r['table'] == 'volume' and r['model'] not in ('hdbet', 'nonzero')))
 segs, vv = {}, None
 for i in ids:
     img = nib.load(os.path.join(D, i + '_segmentation.nii.gz'))

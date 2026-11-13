@@ -12,8 +12,8 @@ Usage:
   build/export_models.py brats2020 <nnU-Net Task082 trainer folder> --out addons/brats2020
   build/export_models.py raidionics-flair <MRI_FLAIRChanges/t2f folder> --out addons/raidionics-flair
   build/export_models.py raidionics-core <MRI_TumorCore/t1c folder> --out addons/raidionics-core
-  build/export_models.py vs-t1c <Dataset910_VSMCRCT1/nnUNetTrainer__nnUNetPlans__3d_fullres> --out addons/vs-t1c
-  build/export_models.py vs-t2  <Dataset911_VSMCRCT2/nnUNetTrainer__nnUNetPlans__3d_fullres> --out addons/vs-t2
+  build/export_models.py vs-t1c <Dataset920_VSMCRCSCGKT1/nnUNetTrainer__nnUNetPlans__3d_fullres> --out addons/vs-t1c
+  build/export_models.py vs-t2  <Dataset921_VSMCRCSCGKT2/nnUNetTrainer__nnUNetPlans__3d_fullres> --out addons/vs-t2
   build/export_models.py aurora-t1c <t1c-o_best.tar> --out addons/aurora-t1c
   build/export_models.py aurora-t1c-flair <t1c-fla_best.tar> --out addons/aurora-t1c-flair
 """
@@ -373,53 +373,52 @@ def _nnunetv2_network(folder, fold, out_dir, q8):
     return pred, common
 
 
+CC_BY_4 = ('Creative Commons Attribution 4.0 International (CC BY 4.0): https://creativecommons.org/licenses/by/4.0/\n'
+           'You may share and adapt the material for any purpose, giving appropriate credit, linking the license\n'
+           'and indicating changes. No warranties are given.\n\n')
 VS_CITATION = ('Kujawa A, Dorent R, Connor S, et al. Deep learning for automatic segmentation of vestibular schwannoma: a '
                'retrospective study from multi-center routine MRI. Front Comput Neurosci 2024;18:1365727. '
                'doi:10.3389/fncom.2024.1365727. Models: Zenodo, doi:10.5281/zenodo.10363647.')
 VS_MODELS = {
     # id: (dataset, input, short name, name, table note)
-    'vs-t1c': ('Dataset910_VSMCRCT1', 'T1c', 'VS T1c', 'Vestibular schwannoma (T1c)',
-               'One class: the vestibular schwannoma (intra- and extrameatal). Trained on contrast-enhanced T1 from routine '
-               'scans of 10 UK hospitals (patients with one sporadic tumor; NF2 excluded). The images are not brain-extracted.'),
-    'vs-t2': ('Dataset911_VSMCRCT2', 'T2', 'VS T2', 'Vestibular schwannoma (T2)',
-              'One class: the vestibular schwannoma (intra- and extrameatal). Trained on T2-weighted images, almost all '
-              'high-resolution (under 1 mm in every direction, e.g. CISS/FIESTA), from routine scans of 10 UK hospitals '
-              '(patients with one sporadic tumor; NF2 excluded). Only the largest connected region is kept, as in the '
-              "model's own postprocessing. The images are not brain-extracted."),
+    'vs-t1c': ('Dataset920_VSMCRCSCGKT1', 'T1c', 'VS T1c', 'Vestibular schwannoma (T1c)',
+               'One class: the vestibular schwannoma (intra- and extrameatal). Trained on contrast-enhanced T1 of patients '
+               'with one sporadic tumor (NF2 excluded): routine scans from 10 UK hospitals and Gamma Knife planning scans. '
+               'The image is used as it is, not brain-extracted.'),
+    'vs-t2': ('Dataset921_VSMCRCSCGKT2', 'T2', 'VS T2', 'Vestibular schwannoma (T2)',
+              'One class: the vestibular schwannoma (intra- and extrameatal). Trained on T2-weighted images, mostly '
+              'high-resolution (e.g. CISS/FIESTA), of patients with one sporadic tumor (NF2 excluded): routine scans from '
+              '10 UK hospitals and Gamma Knife planning scans. The image is used as it is, not brain-extracted.'),
 }
 
 
 def export_vs(folder, out_dir, q8, which, fold=0):
-    """One network (3d_fullres, one fold) of the KCL vestibular schwannoma nnU-Net v2 models
-    (Kujawa et al. 2024, MC-RC models, Zenodo 10363647). folder: the model's
-    nnUNetTrainer__nnUNetPlans__3d_fullres folder (plans.json, dataset.json, fold_<n>/checkpoint_final.pth)."""
+    """One network (3d_fullres, one fold) of the KCL vestibular schwannoma nnU-Net v2 models trained
+    on the combined MC-RC and SC-GK data (Kujawa et al. 2024; MC-RC+SC-GK-models.zip, Zenodo
+    10363647), which the paper found best on most test sets. folder: the model's
+    nnUNetTrainer__nnUNetPlans__3d_fullres folder (plans.json, dataset.json, fold_<n>/checkpoint_final.pth).
+    nnU-Net's cross-validation chose 3d_fullres with keep-the-largest-component postprocessing, but
+    the record's instructions say to omit nnUNetv2_apply_postprocessing, so none is applied."""
     dataset, role, short, name, note = VS_MODELS[which]
+    assert os.path.basename(os.path.dirname(os.path.normpath(folder))) == dataset, folder
     pred, common = _nnunetv2_network(folder, fold, out_dir, q8)
     assert pred.dataset_json['labels'] == {'background': 0, 'Tumor': 1}, pred.dataset_json['labels']
     assert len(pred.dataset_json['channel_names']) == 1
     assert common['normalization'] == [{'scheme': 'ZScoreNormalization', 'useMask': False}], common['normalization']
     assert common['transposeForward'] == [0, 1, 2]
-    # nnU-Net's postprocessing found on the cross-validation (crossval_results_folds_0_1_2_3_4/postprocessing.json):
-    # only remove_all_but_largest_component_from_segmentation for label 1 is implemented (26-connected, as
-    # acvl_utils labels with skimage's full connectivity)
-    pp = None
-    pj = os.path.join(folder, 'crossval_results_folds_0_1_2_3_4', 'postprocessing.json')
-    if os.path.isfile(pj):
-        p = json.load(open(pj))
-        fns, kw = p['postprocessing_fns'], p['postprocessing_kwargs']
-        if fns:
-            assert fns == ['remove_all_but_largest_component_from_segmentation'] and kw == [{'labels_or_regions': [1]}], (fns, kw)
-            pp = {'forWhichClasses': [1], 'connectivity': 26, 'from': 'nnU-Net v2 remove_all_but_largest_component_from_segmentation'}
     return {
         'id': which, 'addonFormat': 1, 'short': short, 'name': name,
-        'version': '%s, nnU-Net v2 3d_fullres, network of fold %d, MC-RC models (Zenodo 10363647)' % (dataset, fold),
+        'version': '%s, nnU-Net v2 3d_fullres, network of fold %d, MC-RC+SC-GK models (Zenodo 10363647)' % (dataset, fold),
         'trainer': 'nnUNetTrainer', 'configuration': '3d_fullres', 'fold': fold,
-        'inputChannels': [role], 'maskInput': False, **common, 'postprocessing': pp,
+        'inputChannels': [role], 'maskInput': False, **common, 'postprocessing': None,
         'labels': [{'value': 1, 'name': 'Vestibular schwannoma', 'short': 'VS', 'color': [255, 77, 77]}],
         'compartments': [{'key': 'vs', 'name': 'Vestibular schwannoma', 'labels': [1]}],
         'compareRegions': {'whole': [1]},
         'tableNote': note, 'citation': VS_CITATION, 'license': 'CC BY 4.0',
         'sourceUrl': 'https://doi.org/10.5281/zenodo.10363647',
+        'licenseText': CC_BY_4 + ('Network parameters: Kujawa A, Dorent R, Connor S, et al. (MC-RC+SC-GK models, %s), Zenodo '
+                                  'doi:10.5281/zenodo.10363647. Changes: the 3d_fullres network of fold %d was exported to ONNX '
+                                  'and its parameters stored as 16-bit floats; nnU-Net inference is reimplemented in JavaScript.\n' % (dataset, fold)),
     }
 
 
@@ -437,11 +436,11 @@ AURORA_MODELS = {
     # id: (weights file stem, inputs, short name, name, table note)
     'aurora-t1c': ('t1c-o', ['T1c'], 'AURORA T1c', 'AURORA brain metastases (T1c)',
                    'Metastasis = contrast-enhancing tumor with necrosis; edema from T1c alone is less reliable (the T1c + FLAIR '
-                   'model is better for edema). Trained on preoperative brain metastases.'),
+                   'model is better for edema). Trained on brain metastases from the AURORA multicenter study.'),
     'aurora-t1c-flair': ('t1c-fla', ['T1c', 'FLAIR'], 'AURORA T1c+FLAIR', 'AURORA brain metastases (T1c + FLAIR)',
                          'Metastasis = contrast-enhancing tumor with necrosis; edema = FLAIR hyperintensity around it. In the '
                          'published test, models with FLAIR found more false-positive lesions than the T1c-only model. '
-                         'Trained on preoperative brain metastases.'),
+                         'Trained on brain metastases from the AURORA multicenter study.'),
 }
 AURORA_CITATION = ('Buchner JA, Kofler F, Etzel L, et al. Development and external validation of an MRI-based neural network for '
                    'brain metastasis segmentation in the AURORA multicenter study. Radiother Oncol 2023;178:109425. '
@@ -513,6 +512,10 @@ def export_aurora(tar, out_dir, q8, which):
         'tableNote': note, 'citation': AURORA_CITATION,
         'license': 'CC BY 4.0 (weights); brainles_aurora code Apache-2.0',
         'sourceUrl': 'https://doi.org/10.5281/zenodo.10557069',
+        'licenseText': CC_BY_4 + ('Network parameters: AURORA weights v1.0.0, %s_best (Buchner JA, Kofler F, et al.; BrainLesion/AURORA), '
+                                  'Zenodo doi:10.5281/zenodo.10557069. Changes: the network was exported to ONNX (mish written with '
+                                  'elementary operations) and its parameters stored as 16-bit floats; the brainles_aurora inference '
+                                  '(Apache License 2.0) is reimplemented in JavaScript.\n' % stem),
     }
 
 

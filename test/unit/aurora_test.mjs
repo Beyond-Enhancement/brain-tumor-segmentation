@@ -50,5 +50,5 @@ const toNifti = a => {
 cfg.inputChannels.forEach((r, i) => fs.writeFileSync(path.join(out, 'aurora_grid_' + r.toLowerCase() + '.nii.gz'),
   writeNifti({ dims: G.dims, affine: G.affine, data: toNifti(debug.raw[i]) }, { dtype: 'f32', gz: true })));
 fs.writeFileSync(path.join(out, 'js_prob.raw'), Buffer.from(debug.prob.buffer, debug.prob.byteOffset, debug.prob.byteLength));
-fs.writeFileSync(path.join(out, 'js_meta.json'), JSON.stringify({ dims: G.dims, affine: [...G.affine], snapped: G.snapped, pct: debug.pct, tta, info: res.info }));
+fs.writeFileSync(path.join(out, 'js_meta.json'), JSON.stringify({ dims: G.dims, affine: [...G.affine], snapped: G.snapped, sameFrame: G.sameFrame, pct: debug.pct, tta, info: res.info }));
 fs.writeFileSync(path.join(out, 'js_seg.nii.gz'), writeNifti({ dims: grid.dims, affine: grid.affine, data: res.seg }, { dtype: 'u8', gz: true }));

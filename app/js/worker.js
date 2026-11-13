@@ -435,7 +435,7 @@ async function run(assignment, opt) {
     models: results.map(r => {
       const c = r.cfg;
       return { id: c.id, name: c.name, short: mn(c), version: c.version, weights: c.weights.format, source: c.source || null, citation: c.citation || null, license: c.license || null,
-        kind: c.kind || 'nnunet', tableNote: c.tableNote || null, labels: c.labels, compartments: c.compartments, inputs: c.inputChannels, comps: r.comps, segInfo: r.segInfo, ms: r.ms, tta: r.tta };
+        kind: c.kind || 'nnunet', masked: maskedInput(c), tableNote: c.tableNote || null, labels: c.labels, compartments: c.compartments, inputs: c.inputChannels, comps: r.comps, segInfo: r.segInfo, ms: r.ms, tta: r.tta };
     }),
     compare, bet: doBet ? (await loadModelConfig('hdbet')).version : null,
   }, transfer);

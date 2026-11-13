@@ -9,7 +9,7 @@
 # The models must have been exported first (build/export_models.py).
 set -euo pipefail
 cd "$(dirname "$0")/.."
-VERSION="1.4.0"  # keep in sync with appVer in launcher/main.go
+VERSION="1.5.0"  # keep in sync with appVer in launcher/main.go
 NAME="Brain Tumor Segmentation Workbench"
 
 python3 build/prepare_site.py
@@ -48,5 +48,11 @@ if [ -f addons/raidionics-core/config.json ]; then
   python3 build/package_addon.py addons/raidionics-core dist/BrainTumorSegmentationWorkbench-model-Raidionics-TumorCore.btsmodel
   ADDONS+=(BrainTumorSegmentationWorkbench-model-Raidionics-TumorCore.btsmodel)
 fi
+for pair in aurora-t1c:AURORA-T1c aurora-t1c-flair:AURORA-T1c-FLAIR vs-t1c:VS-T1c vs-t2:VS-T2; do
+  if [ -f "addons/${pair%%:*}/config.json" ]; then
+    python3 build/package_addon.py "addons/${pair%%:*}" "dist/BrainTumorSegmentationWorkbench-model-${pair#*:}.btsmodel"
+    ADDONS+=("BrainTumorSegmentationWorkbench-model-${pair#*:}.btsmodel")
+  fi
+done
 ( cd dist && sha256sum BrainTumorSegmentationWorkbench.exe BrainTumorSegmentationWorkbench-macOS-*.zip "${ADDONS[@]}" btsw-linux-amd64 > SHA256SUMS.txt && cat SHA256SUMS.txt )
 ls -la dist

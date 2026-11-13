@@ -201,7 +201,13 @@ const MODEL_BLURB = {
   brats2020: 'Enhancing tumor, necrosis, edema (BraTS labels). T1, T1c, T2, FLAIR.',
   'raidionics-flair': 'FLAIR hyperintensity (tumor and edema). FLAIR only.',
   'raidionics-core': 'Tumor core: enhancing tissue, necrosis, cysts; gliomas, meningiomas, metastases. T1c only.',
+  'vs-t1c': 'Vestibular schwannoma. T1c only; whole-head image, no brain extraction.',
+  'vs-t2': 'Vestibular schwannoma. High-resolution T2 (e.g. CISS) only; whole-head image, no brain extraction.',
+  'aurora-t1c': 'Brain metastases: metastasis (enhancing tumor and necrosis) and edema. T1c only.',
+  'aurora-t1c-flair': 'Brain metastases: metastasis (enhancing tumor and necrosis) and edema. T1c and FLAIR.',
 };
+// models that use the HD-BET brain mask (all but those trained on whole-head images)
+const needsBrain = ms => ms.some(md => md.usesBrain !== false);
 function modelInfo(md) {
   if (md.id === 'hdglio') return 'HD-GLIO (Kickingereder et al. 2019): contrast-enhancing tumor and non-enhancing T2/FLAIR abnormality; no necrosis class. Built in.';
   const comps = (md.compartments || []).map(c => (c.name.match(/\(([^)]*)\)\s*$/) || [])[1] || c.name).filter(Boolean);
@@ -237,8 +243,10 @@ function updateModelNote() {
   const ttaUsers = ms.filter(md => md.tta !== false);
   const tta = $('#optTta');
   tta.disabled = !ttaUsers.length;
-  $('#ttaNote').textContent = !ttaUsers.length ? 'Not used by ' + (ms.length > 1 ? 'these models' : 'this model') + ', as in ' + (ms.length > 1 ? 'their' : 'its') + ' original software.'
-    : ttaUsers.length < ms.length ? 'Applies to ' + ttaUsers.map(shortName).join(' and ') + ' only.' : '';
+  const aur = ttaUsers.filter(md => md.kind === 'aurora');
+  $('#ttaNote').textContent = (!ttaUsers.length ? 'Not used by ' + (ms.length > 1 ? 'these models' : 'this model') + ', as in ' + (ms.length > 1 ? 'their' : 'its') + ' original software.'
+    : ttaUsers.length < ms.length ? 'Applies to ' + ttaUsers.map(shortName).join(' and ') + ' only.' : '') +
+    (aur.length ? (ttaUsers.length < ms.length || !ttaUsers.length ? ' ' : '') + aur.map(shortName).join(' and ') + ': 3 passes (as is and flipped on two axes), which is its own 13-pass augmentation without the small noise it adds.' : '');
   if (!ui.running) ui.runModels = null;
   if (ui.series.length) autoAssignSingle();
   renderRoles();
@@ -268,18 +276,25 @@ function updateRefLabels() {
   const ref = effectiveRef(), chosen = refSeq();
   const req = requiredRoles(), ms = selectedModels();
   const others = req.length === 4 ? ROLES.filter(r => r !== ref) : loadedRoles().filter(r => r !== ref);
-  $('#betLabel').textContent = 'Brain extraction with HD-BET on ' + ref + '.';
+  const bet = !ms.length || needsBrain(ms);
+  $('#betLabel').textContent = bet ? 'Brain extraction with HD-BET on ' + ref + '.' : 'Brain extraction: not used by ' + (ms.length > 1 ? 'these models' : 'this model') + ' (trained on whole-head images).';
+  $('#optBet').disabled = !bet;
+  $('#betHint').hidden = !bet;
   $('#regLabel').textContent = others.length === 3 ? 'Rigid registration of ' + others.slice(0, 2).join(', ') + ' and ' + others[2] + ' to ' + ref + '.'
     : others.length ? 'Rigid registration of ' + others.join(' and ') + ' to ' + ref + '.' : 'Rigid registration of the other sequences, if any, to ' + ref + '.';
   const notes = [];
   if (ref !== chosen) notes.push(chosen + ' is not loaded, so ' + ref + ' is the reference.');
-  if (!ms.length || ms.some(md => md.kind !== 'raidionics')) notes.push(ref === 'T1'
+  if (!ms.length || ms.some(md => md.id === 'hdglio')) notes.push(ref === 'T1'
     ? 'HD-GLIO was published with everything registered to T1.'
     : 'Brain mask, registration and outputs on the ' + ref + ' grid. HD-GLIO was published with T1 as the reference; registering to a thinner-slice ' + ref + ' keeps more detail.');
   for (const md of ms.filter(x => x.kind === 'raidionics')) {
     const inp = (md.inputChannels || ['FLAIR'])[0];
     notes.push(ref === inp && $('#optGrid').value === 'native' ? 'Raidionics runs on the ' + inp + ' as acquired, as in its own software. The HD-BET mask only removes findings outside the brain.'
       : 'Raidionics was validated on the ' + inp + ' as acquired: register to ' + inp + ' with the grid as acquired to match it.');
+  }
+  for (const md of ms.filter(x => x.usesBrain === false)) {
+    const inp = md.inputChannels[0];
+    if (!(ref === inp && $('#optGrid').value === 'native')) notes.push(shortName(md) + ' was trained on the ' + inp + ' as acquired: register to ' + inp + ' with the grid as acquired to keep its resolution.');
   }
   $('#refNote').textContent = notes.join(' ');
   if (!ui.running && document.querySelector('#steps li')) renderSteps(null);
@@ -342,7 +357,7 @@ $('#runBtn').onclick = () => {
   ui.runModels = selectedModels();
   if (cancelFlag) Atomics.store(cancelFlag, 0, 0);
   for (const k of Object.keys(stepState)) delete stepState[k];
-  if (!$('#optBet').checked) stepState.hdbet = { skip: true };
+  if (!$('#optBet').checked || !needsBrain(ui.runModels)) stepState.hdbet = { skip: true };
   if (loadedRoles().length < 2) stepState.register = { skip: true };
   curStep = 'prepare'; stepStart = runStart = performance.now();
   renderSteps('prepare');
@@ -553,10 +568,11 @@ function renderVolumes() {
       tb.appendChild(tr);
     }
   }
-  const tr = document.createElement('tr');
-  const skipped = stepState.hdbet && stepState.hdbet.skip;
-  tr.innerHTML = `<td></td><td class="muted">${skipped ? 'Brain (nonzero voxels of the input)' : 'Brain (HD-BET mask)'}</td><td class="num muted">${m.brainCm3.toFixed(0)}</td>`;
-  tb.appendChild(tr);
+  if (m.brainUsed) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td></td><td class="muted">${m.bet ? 'Brain (HD-BET mask)' : 'Brain (nonzero voxels of the input)'}</td><td class="num muted">${m.brainCm3.toFixed(0)}</td>`;
+    tb.appendChild(tr);
+  }
   $$('#volTable .swatch').forEach(s => s.onclick = () => {
     const h = s.dataset.h; ui.hidden.has(h) ? ui.hidden.delete(h) : ui.hidden.add(h);
     const id = h.split(':')[0];
@@ -566,10 +582,10 @@ function renderVolumes() {
   const vs = m.voxelSize.map(v => v.toFixed(2)).join(' x ');
   $('#volMeta').textContent = `Counted on the ${m.refRole} grid: ${m.dims.join(' x ')} voxels of ${vs} mm (${m.voxelVolume.toFixed(3)} mm3 each).` + (multi ? ' Click a colour to show that model on the viewer and hide or show the label.' : '');
   const labs = m.models.map(md => (multi ? shortName(md) + ': ' : '') + md.labels.map(l => l.value + ' ' + l.name).join(', ')).join('. ');
-  const inNote = Object.entries(m.inputKind).some(([, k]) => k === 'raidionics') && Object.values(m.inputKind).some(k => k === 'masked')
-    ? 'Inputs are the registered, brain-extracted images; Raidionics got the ' + Object.keys(m.inputKind).filter(r => m.inputKind[r] === 'raidionics').join(', ') + ' without brain extraction.'
-    : Object.values(m.inputKind).every(k => k === 'raidionics') ? 'The ' + m.inputs.join(', ') + ' input is the image given to Raidionics (not brain-extracted).'
-    : 'Inputs are the registered, brain-extracted images given to ' + m.models.filter(md => md.kind !== 'raidionics').map(shortName).join(' and ') + '.';
+  const raw = m.inputs.filter(r => m.inputKind[r] === 'raw');
+  const inNote = !raw.length ? 'Inputs are the registered, brain-extracted images given to ' + m.models.filter(md => md.masked).map(shortName).join(' and ') + '.'
+    : raw.length === m.inputs.length ? 'The ' + raw.join(', ') + (raw.length > 1 ? ' inputs are the images' : ' input is the image') + ' given to ' + [...new Set(raw.map(r => m.inputModel[r]))].join(' and ') + ' (not brain-extracted).'
+    : 'Inputs are the registered, brain-extracted images; ' + raw.map(r => m.inputModel[r] + ' got the ' + r).join(', ') + ' without brain extraction.';
   $('#expNote').textContent = 'Saved on the grid of the reference ' + m.refRole + ' as loaded. Labels: 0 background, ' + labs + '. ' +
     (multi ? 'Agreement map: 1 first model only, 2 second only, 3 both, for the region and models chosen under Model comparison. ' : '') + inNote +
     (m.roles.some(r => !m.inputs.includes(r)) ? ' Other sequences are exported as registered.' : '');
@@ -666,12 +682,13 @@ function renderQC() {
   const dev = m.backend === 'webgpu' ? 'GPU (WebGPU' + (m.gpu && m.gpu.vendor ? ', ' + m.gpu.vendor : '') + ')' : 'CPU (' + (ui.env ? ui.env.threads : '?') + ' threads)';
   const tm = m.timing;
   const wf = w => ({ q8: '8-bit weights', f16: '16-bit weights', f32: '32-bit weights' }[w] || '');
-  const aug = md => (md.tta ? '8 mirrored passes' : md.kind === 'raidionics' ? 'none (as in Raidionics)' : 'off');
+  const aug = md => (md.tta ? (md.kind === 'aurora' ? '3 passes (AURORA without its noise)' : '8 mirrored passes') : md.kind === 'raidionics' ? 'none (as in Raidionics)' : 'off');
   $('#runInfo').innerHTML = '<div class="qc">' + m.models.map(md => `<span>${m.models.length > 1 ? esc(shortName(md)) : 'Model'}</span><span>${esc(md.name)} ${esc(md.version || '')}${wf(md.weights) ? ', ' + wf(md.weights) : ''}; augmentation ${aug(md)}` +
-      (md.segInfo ? `; head crop and 1 mm grid ${md.segInfo.resampledDims.join(' x ')}, ${md.segInfo.patches} patches` : '') + `; ${fmtMs(md.ms)}</span>`).join('') +
+      (md.segInfo && md.kind === 'raidionics' ? `; head crop and 1 mm grid ${md.segInfo.resampledDims.join(' x ')}, ${md.segInfo.patches} patches` : '') +
+      (md.segInfo && md.kind === 'aurora' ? `; 1 mm grid ${md.segInfo.grid.join(' x ')}${md.segInfo.sameFrame ? ', the reference as it is' : md.segInfo.snapped ? ' on the reference voxels' : ' (resampled)'}, ${md.segInfo.windows} windows` : '') + `; ${fmtMs(md.ms)}</span>`).join('') +
     (m.bet ? `<span>Brain mask</span><span>HD-BET ${esc(m.bet)}</span>` : '') +
     `<span>Compute</span><span>${dev}</span>` +
-    `<span>Time</span><span>${fmtMs(tm.total)} (prepare ${fmtMs(tm.prepare)}, HD-BET ${fmtMs(tm.hdbet)}, registration ${fmtMs(tm.register)}, segmentation ${fmtMs(tm.seg)})</span></div>` +
+    `<span>Time</span><span>${fmtMs(tm.total)} (prepare ${fmtMs(tm.prepare)}, ${m.bet ? 'HD-BET ' + fmtMs(tm.hdbet) + ', ' : ''}registration ${fmtMs(tm.register)}, segmentation ${fmtMs(tm.seg)})</span></div>` +
     (m.notes.length ? '<p class="warn">' + m.notes.map(esc).join('<br>') + '</p>' : '');
 }
 
@@ -689,6 +706,10 @@ function renderExports() {
     b.textContent = m.models.length > 1 ? 'Segmentation: ' + shortName(md) : 'Segmentation';
     box.insertBefore(b, first);
   }
+  // no brain mask to offer when no model used one (the schwannoma models alone)
+  box.querySelector('[data-exp="brain"]').hidden = !m.brainUsed;
+  $('#optBrain').closest('label').hidden = !m.brainUsed;
+  if (!m.brainUsed) $('#optBrain').checked = false;
   const ag = box.querySelector('[data-exp="agree"]');
   ag.hidden = !ui.cmpPair; ag.disabled = !ui.cmpPair;
   ag.title = 'The agreement map of the two models and region chosen under Model comparison';
@@ -719,7 +740,7 @@ function tableRows() {
   const m = ui.result, C = m.compare;
   const rows = [['table', 'model', 'model_b', 'compartment_or_region', 'labels', 'volume_cm3', 'voxels', 'dice', 'both_cm3', 'model_only_cm3', 'model_b_only_cm3']];
   for (const md of m.models) for (const c of md.comps) rows.push(['volume', md.id, '', c.name, c.labels.join('+'), c.cm3.toFixed(3), c.voxels, '', '', '', '']);
-  rows.push(['volume', 'hdbet', '', 'brain', 'mask', m.brainCm3.toFixed(1), '', '', '', '', '']);
+  if (m.brainUsed) rows.push(['volume', m.bet ? 'hdbet' : 'nonzero', '', 'brain', 'mask', m.brainCm3.toFixed(1), '', '', '', '', '']);
   if (m.models.length > 1 && C) {
     const rn = k => (C.regions.find(r => r.key === k) || { name: k }).name;
     for (const v of C.volumes) for (const [k, r] of Object.entries(v.regions)) rows.push(['region', v.id, '', rn(k), r.labels.join('+'), r.cm3.toFixed(3), r.voxels, '', '', '', '']);
