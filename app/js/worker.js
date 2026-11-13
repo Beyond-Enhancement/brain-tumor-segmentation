@@ -1,6 +1,6 @@
 // Processing worker: input parsing, preprocessing (as in the HD-GLIO README), HD-BET brain
-// extraction, rigid registration, segmentation (HD-GLIO or an add-on model: nnU-Net, or Raidionics
-// with its own preprocessing) and NIfTI export. Nothing leaves the computer: the worker only talks
+// extraction, rigid registration, segmentation (HD-GLIO or an add-on model: nnU-Net, Raidionics or
+// AURORA, the last two with their own preprocessing) and NIfTI export. Nothing leaves the computer: the worker only talks
 // to the page and fetches its own bundled files.
 import { readNifti, writeNifti, isGzip } from './lib/nifti.js';
 import * as G from './lib/geom.js';
@@ -8,6 +8,7 @@ import * as DCM from './lib/dicom.js';
 import { registerRigid } from './lib/register.js';
 import { predictCase, labelComponents } from './lib/nnunet.js';
 import { predictRaidionics } from './lib/raidionics.js';
+import { predictAurora } from './lib/aurora.js';
 import { Network, gpuInfo, loadOrt } from './lib/ortrun.js';
 import { unzipSync, gunzipSync } from '../vendor/fflate.mjs';
 
@@ -174,7 +175,14 @@ async function registerAddon(name, u8) {
       P.channelsOrder === 'channels_first' && P.numClasses === 1 && P.numberInputs === 1 && cfg.inputChannels.length === 1 && !P.swapInput &&
       P.reconstructionOrder === 'resample_first' && Array.isArray(P.patchSize) && P.patchSize.length === 3 && Array.isArray(P.outputSpacing) && P.outputSpacing.length === 3;
     if (!ok) throw new Error(name + ': Raidionics configuration not supported by this version of the workbench');
+  } else if (cfg.kind === 'aurora') {
+    const P = cfg.aurora || {}, eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+    const ok = eq(P.roiSize, [192, 192, 32]) && P.overlap === 0.5 && P.blend === 'gaussian' && P.sigmaScale === 0.125 && P.padding === 'replicate' &&
+      eq(P.percentiles, [0.5, 99.5]) && P.threshold === 0.5 && eq(P.outChannels, ['whole', 'metastasis']) && eq(P.gridSpacing, [1, 1, 1]) &&
+      P.gridAxes === 'LPS' && eq(P.gridDims, [240, 240, 155]) && (!P.tta || (eq(P.tta.flipAxes, [0, 1]) && P.tta.weights.length === 3));
+    if (!ok) throw new Error(name + ': AURORA configuration not supported by this version of the workbench');
   } else if (![1, 2].includes(cfg.nnunet)) throw new Error(name + ': unsupported model');
+  if (cfg.postprocessing && cfg.postprocessing.connectivity && ![6, 26].includes(cfg.postprocessing.connectivity)) throw new Error(name + ': unsupported postprocessing');
   const onnx = get(cfg.onnx), pack = get(cfg.weights && cfg.weights.pack);
   if (!onnx || !pack) throw new Error(name + ': network files missing');
   const digest = hex(await crypto.subtle.digest('SHA-256', pack));
@@ -208,6 +216,7 @@ async function postModels(added) {
     id: c.id, name: c.name, version: c.version, source: c.source || null, license: c.license || null, citation: c.citation || null,
     labels: c.labels, compartments: c.compartments, weights: c.weights.format,
     inputChannels: c.inputChannels, kind: c.kind || 'nnunet', tta: c.tta !== false, tableNote: c.tableNote || null, short: c.short || null,
+    usesBrain: usesBrain(c),
   })).sort((a, b) => (a.id === 'hdglio' ? -1 : b.id === 'hdglio' ? 1 : a.name.localeCompare(b.name)));
   post('models', { list, errors: state.addonErrors.splice(0), added: added || null });
 }
@@ -246,6 +255,11 @@ const MODEL_REGIONS = {
   'raidionics-core': { core: [1] },
 };
 const regionsFor = cfg => cfg.compareRegions || MODEL_REGIONS[cfg.id] || { whole: cfg.labels.map(l => l.value) };
+// Inputs: nnU-Net models get the brain-extracted images unless their config says otherwise (the
+// vestibular schwannoma models were trained on whole-head images); AURORA gets them brain-extracted;
+// Raidionics gets the image as it is and uses the brain mask afterwards.
+const maskedInput = cfg => cfg.kind !== 'raidionics' && cfg.maskInput !== false;
+const usesBrain = cfg => cfg.kind === 'raidionics' || maskedInput(cfg);
 const labelLut = labels => { const t = new Uint8Array(256); for (const l of labels) t[l] = 1; return t; };
 
 async function run(assignment, opt) {
@@ -306,9 +320,10 @@ async function run(assignment, opt) {
     st === 'network' && e ? name + ': patch ' + e.tile + '/' + e.tiles + (e.mirrors > 1 ? ', mirror ' + e.mirror + '/' + e.mirrors : '') + (ctx.backend === 'webgpu' ? ' (GPU)' : '')
       : st === 'post' ? name + ': back to the reference grid' : name + ' preprocessing');
 
-  // 2) brain extraction (HD-BET) on the reference
+  // 2) brain extraction (HD-BET) on the reference, when a selected model uses the brain mask
+  const needBrain = cfgs.some(usesBrain), doBet = !!opt.skullStrip && needBrain;
   let brain;
-  if (opt.skullStrip) {
+  if (doBet) {
     progress('hdbet', 0, 'HD-BET brain extraction on ' + refRole);
     const betProgress = netProgress('hdbet', 'HD-BET');
     const { res: r } = await runNetwork('hdbet', 'HD-BET', 'hdbet', ctx, net => predictCase([refOnGrid.data], npShape(grid.dims), npSpacing(grid.affine), net.cfg, (p, d) => net.run(p, d), { tta: !!opt.ttaBet, shouldStop: cancelled, onProgress: betProgress }));
@@ -321,7 +336,7 @@ async function run(assignment, opt) {
     for (let i = 0; i < brain.length; i++) brain[i] = refOnGrid.data[i] > 0 ? 1 : 0;
   }
   let nBrain = 0; for (const v of brain) nBrain += v;
-  if (nBrain < 1000) throw new Error('Brain extraction found no brain. Check the reference series.');
+  if (nBrain < 1000) throw new Error(doBet ? 'Brain extraction found no brain. Check the reference series.' : 'The reference image is empty.');
   T.hdbet = now();
 
   // 3) registration of the other sequences to the reference
@@ -346,9 +361,10 @@ async function run(assignment, opt) {
   }
   T.register = now();
 
-  // 4) model inputs. nnU-Net models (HD-GLIO and add-ons): sequences masked with the reference
-  // brain mask (fslmaths -mas). Raidionics: the image as it is (the model crops the head itself);
-  // the brain mask is used afterwards to drop findings outside the brain.
+  // 4) model inputs. nnU-Net models (HD-GLIO and add-ons) and AURORA: sequences masked with the
+  // reference brain mask (fslmaths -mas), except models trained on whole-head images (maskInput
+  // false: the vestibular schwannoma models). Raidionics: the image as it is (the model crops the
+  // head itself); the brain mask is used afterwards to drop findings outside the brain.
   const masked = {};
   const getMasked = r => {
     if (!masked[r]) { const d = new Float32Array(onRef[r]); for (let i = 0; i < d.length; i++) if (!brain[i]) d[i] = 0; masked[r] = d; }
@@ -359,22 +375,24 @@ async function run(assignment, opt) {
   const vv = G.voxelVolume(grid.affine);
   const results = [];
   for (const c of cfgs) {
-    const key = 'seg:' + c.id, name = mn(c), raid = c.kind === 'raidionics';
+    const key = 'seg:' + c.id, name = mn(c), raid = c.kind === 'raidionics', aur = c.kind === 'aurora';
     const t0 = now();
     progress(key, 0, 'Loading ' + name);
     const pr = netProgress(key, name);
     const { res } = await runNetwork(c.id, name, key, ctx, raid
-      ? net => predictRaidionics({ dims: grid.dims, affine: grid.affine, data: onRef[c.inputChannels[0]] }, opt.skullStrip ? brain : null, net.cfg, (p, d) => net.run(p, d), { shouldStop: cancelled, onProgress: pr })
-      : net => predictCase(c.inputChannels.map(getMasked), npShape(grid.dims), npSpacing(grid.affine), net.cfg, (p, d) => net.run(p, d), { tta: !!opt.tta, shouldStop: cancelled, onProgress: pr }));
+      ? net => predictRaidionics({ dims: grid.dims, affine: grid.affine, data: onRef[c.inputChannels[0]] }, doBet ? brain : null, net.cfg, (p, d) => net.run(p, d), { shouldStop: cancelled, onProgress: pr })
+      : aur ? net => predictAurora(c.inputChannels.map(getMasked), grid, brain, net.cfg, (p, d) => net.run(p, d), { tta: !!opt.tta, shouldStop: cancelled, onProgress: pr })
+      : net => predictCase(c.inputChannels.map(r => (maskedInput(c) ? getMasked(r) : onRef[r])), npShape(grid.dims), npSpacing(grid.affine), net.cfg, (p, d) => net.run(p, d), { tta: !!opt.tta, shouldStop: cancelled, onProgress: pr }));
     if (multi) await releaseNetwork(c.id);
     if (raid && res.info.removedOutsideBrain) note(name + ': ' + (res.info.removedOutsideBrain * vv / 1000).toFixed(2) + ' cm3 outside the brain mask removed (brain overlap refinement)');
+    if (aur && res.info.brainOutsideGrid) note(name + ': ' + (res.info.brainOutsideGrid * vv / 1000).toFixed(2) + ' cm3 of the brain mask lay outside its 1 mm grid and was not segmented');
     const counts = new Array(256).fill(0); // by label value (BraTS uses 1, 2, 4)
     for (const v of res.seg) counts[v]++;
     const comps = c.compartments.map(cp => {
       const n = cp.labels.reduce((a, l) => a + counts[l], 0);
       return { key: cp.key, name: cp.name, labels: cp.labels, voxels: n, cm3: n * vv / 1000 };
     });
-    results.push({ cfg: c, seg: res.seg, comps, segInfo: raid ? res.info : null, ms: now() - t0, tta: !!opt.tta && !raid });
+    results.push({ cfg: c, seg: res.seg, comps, segInfo: raid || aur ? res.info : null, ms: now() - t0, tta: !!opt.tta && c.tta !== false && !raid });
   }
   backend = ctx.backend;
   T.seg = now();
@@ -393,14 +411,15 @@ async function run(assignment, opt) {
   }
   const compare = compareModels(results, vv);
 
-  // inputs as exported: brain-extracted when an nnU-Net model used them, else as given to Raidionics
-  const inputs = {}, inputKind = {}, inputPrefix = {};
+  // inputs as exported: brain-extracted when a model used them so, else as given to the model
+  // (Raidionics, the vestibular schwannoma models)
+  const inputs = {}, inputKind = {}, inputPrefix = {}, inputModel = {};
   for (const r of required) {
-    const nn = cfgs.find(c => c.kind !== 'raidionics' && c.inputChannels.includes(r));
-    if (nn) { inputs[r] = getMasked(r); inputKind[r] = 'masked'; inputPrefix[r] = nn.id; }
-    else { inputs[r] = onRef[r]; inputKind[r] = 'raidionics'; inputPrefix[r] = cfgs.find(c => c.inputChannels.includes(r)).id; }
+    const nn = cfgs.find(c => maskedInput(c) && c.inputChannels.includes(r));
+    const c0 = nn || cfgs.find(c => c.inputChannels.includes(r));
+    inputs[r] = nn ? getMasked(r) : onRef[r]; inputKind[r] = nn ? 'masked' : 'raw'; inputPrefix[r] = c0.id; inputModel[r] = mn(c0);
   }
-  state.result = { grid, gridIsNativeRef, refRole, plan: plans[refRole], rawRef: raw[refRole], onRef, inputs, inputKind, inputPrefix, brain, results };
+  state.result = { grid, gridIsNativeRef, refRole, plan: plans[refRole], rawRef: raw[refRole], onRef, inputs, inputKind, inputPrefix, inputModel, brain, results };
   const timing = { prepare: T.prepare - T.start, hdbet: T.hdbet - T.prepare, register: T.register - T.hdbet, seg: T.seg - T.register, total: T.seg - T.start };
 
   // 7) send display volumes (uncompressed NIfTI) to the page
@@ -411,14 +430,14 @@ async function run(assignment, opt) {
   add('brain', brain, 'u8');
   for (const r of results) add('seg:' + r.cfg.id, r.seg, 'u8');
   post('result', {
-    vols, brainCm3, tumorCenterMM, voxelVolume: vv, voxelSize: G.spacing(grid.affine), dims: grid.dims, reg, refRole, roles: loaded, inputs: required, inputKind,
+    vols, brainCm3, brainUsed: needBrain, tumorCenterMM, voxelVolume: vv, voxelSize: G.spacing(grid.affine), dims: grid.dims, reg, refRole, roles: loaded, inputs: required, inputKind, inputModel,
     backend, gpu, gpuFailed: ctx.gpuFailed, usedGpu: ctx.usedGpu && !ctx.gpuFailed, timing, notes: log, tta: results.some(r => r.tta),
     models: results.map(r => {
       const c = r.cfg;
       return { id: c.id, name: c.name, short: mn(c), version: c.version, weights: c.weights.format, source: c.source || null, citation: c.citation || null, license: c.license || null,
         kind: c.kind || 'nnunet', tableNote: c.tableNote || null, labels: c.labels, compartments: c.compartments, inputs: c.inputChannels, comps: r.comps, segInfo: r.segInfo, ms: r.ms, tta: r.tta };
     }),
-    compare, bet: opt.skullStrip ? (await loadModelConfig('hdbet')).version : null,
+    compare, bet: doBet ? (await loadModelConfig('hdbet')).version : null,
   }, transfer);
 }
 
@@ -538,9 +557,9 @@ function doExport(what, reqId) {
   else if (what.startsWith('input:')) {
     const r = what.slice(6);
     if (R.inputs[r]) {
-      const raid = R.inputKind[r] === 'raidionics';
+      const raw = R.inputKind[r] === 'raw';
       vol = toOutputGrid(R.inputs[r], Float32Array); name = R.inputPrefix[r] + '_input_' + r.toLowerCase() + '.nii.gz';
-      descrip = raid ? r + ' as given to Raidionics' : r + ' registered, brain-extracted';
+      descrip = raw ? (r + ' as given to ' + R.inputModel[r]).slice(0, 79) : r + ' registered, brain-extracted';
     } else if (R.onRef[r]) {
       vol = toOutputGrid(R.onRef[r], Float32Array); name = 'registered_' + r.toLowerCase() + '.nii.gz'; descrip = r + ' registered to ' + R.refRole;
     } else throw new Error(r + ' was not loaded');

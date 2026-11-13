@@ -41,10 +41,12 @@ export function fillHoles(mask, shape) {
   return out;
 }
 
-// scipy.ndimage.label with the default (6-connected) structure. Returns {labels:Int32Array, n, sizes}
-export function labelComponents(mask, shape) {
+// Connected components. connectivity 6: scipy.ndimage.label with its default structure;
+// 26: skimage.measure.label with full connectivity. Returns {labels:Int32Array, n, sizes}
+export function labelComponents(mask, shape, connectivity = 6) {
   const [d0, d1, d2] = shape, n = mask.length, s0 = d1 * d2;
   const lab = new Int32Array(n), stack = new Int32Array(n);
+  const full = connectivity === 26;
   let cur = 0; const sizes = [0];
   for (let v0 = 0; v0 < n; v0++) {
     if (!mask[v0] || lab[v0]) continue;
@@ -52,6 +54,20 @@ export function labelComponents(mask, shape) {
     while (sp) {
       const v = stack[--sp]; size++;
       const c = v % d2, b = ((v - c) / d2) % d1, a = (v - c - b * d2) / s0;
+      if (full) {
+        for (let da = -1; da <= 1; da++) {
+          const aa = a + da; if (aa < 0 || aa >= d0) continue;
+          for (let db = -1; db <= 1; db++) {
+            const bb = b + db; if (bb < 0 || bb >= d1) continue;
+            for (let dc = -1; dc <= 1; dc++) {
+              const cc = c + dc; if (cc < 0 || cc >= d2) continue;
+              const w = (aa * d1 + bb) * d2 + cc;
+              if (mask[w] && !lab[w]) { lab[w] = cur; stack[sp++] = w; }
+            }
+          }
+        }
+        continue;
+      }
       const nb = [a > 0 ? v - s0 : -1, a < d0 - 1 ? v + s0 : -1, b > 0 ? v - d2 : -1, b < d1 - 1 ? v + d2 : -1, c > 0 ? v - 1 : -1, c < d2 - 1 ? v + 1 : -1];
       for (const w of nb) if (w >= 0 && mask[w] && !lab[w]) { lab[w] = cur; stack[sp++] = w; }
     }
@@ -60,13 +76,15 @@ export function labelComponents(mask, shape) {
   return { labels: lab, n: cur, sizes };
 }
 
-// nnU-Net v1 remove_all_but_the_largest_connected_component
-export function keepLargestComponents(seg, shape, forWhichClasses, voxelVolume, minValid) {
+// nnU-Net v1 remove_all_but_the_largest_connected_component (6-connected); with connectivity 26
+// nnU-Net v2 remove_all_but_largest_component_from_segmentation (acvl_utils: skimage labels,
+// every component as large as the largest is kept)
+export function keepLargestComponents(seg, shape, forWhichClasses, voxelVolume, minValid, connectivity = 6) {
   for (const cls of forWhichClasses) {
     const set = Array.isArray(cls) ? cls : [cls];
     const mask = new Uint8Array(seg.length);
     for (let v = 0; v < seg.length; v++) if (set.includes(seg[v])) mask[v] = 1;
-    const { labels, n, sizes } = labelComponents(mask, shape);
+    const { labels, n, sizes } = labelComponents(mask, shape, connectivity);
     if (!n) continue;
     const vol = sizes.map(s => s * voxelVolume);
     const maxv = Math.max(...vol.slice(1));
@@ -308,9 +326,12 @@ export async function predictCase(channels, shapeNp, spacingNp, cfg, runPatch, o
   if (opts.debug) opts.debug.probs = probs;
   // 5) back to cropped original shape (order 1, separate z as nnU-Net decides on export)
   const K = cfg.numClasses, nc = prod(cs);
+  // nnU-Net v1 (export) looks at the original spacing first; v2 (determine_do_sep_z_and_axis with
+  // the current = target spacing) at the target spacing first
   let zAxB = null;
-  if (getDoSeparateZ(spacing, cfg.anisotropyThreshold ?? 3)) { const ax = lowresAxes(spacing); if (ax.length === 1) zAxB = ax[0]; }
-  else if (getDoSeparateZ(target, cfg.anisotropyThreshold ?? 3)) { const ax = lowresAxes(target); if (ax.length === 1) zAxB = ax[0]; }
+  const [firstSp, secondSp] = cfg.nnunet === 2 ? [target, spacing] : [spacing, target];
+  if (getDoSeparateZ(firstSp, cfg.anisotropyThreshold ?? 3)) { const ax = lowresAxes(firstSp); if (ax.length === 1) zAxB = ax[0]; }
+  else if (getDoSeparateZ(secondSp, cfg.anisotropyThreshold ?? 3)) { const ax = lowresAxes(secondSp); if (ax.length === 1) zAxB = ax[0]; }
   const back = [];
   for (let k = 0; k < K; k++) {
     const pk = probs.subarray(k * np, (k + 1) * np);
@@ -330,7 +351,7 @@ export async function predictCase(channels, shapeNp, spacingNp, cfg, runPatch, o
   const seg = Uint8Array.from(segBack);
   // 7) postprocessing (connected components), on the original grid
   if (cfg.postprocessing && cfg.postprocessing.forWhichClasses && cfg.postprocessing.forWhichClasses.length) {
-    keepLargestComponents(seg, shapeNp, cfg.postprocessing.forWhichClasses, spacingNp[0] * spacingNp[1] * spacingNp[2], cfg.postprocessing.minValidObjectSizes);
+    keepLargestComponents(seg, shapeNp, cfg.postprocessing.forWhichClasses, spacingNp[0] * spacingNp[1] * spacingNp[2], cfg.postprocessing.minValidObjectSizes, cfg.postprocessing.connectivity || 6);
   }
   // 8) optional relabelling to the published convention (e.g. BraTS: 1 NCR, 2 ED, 4 ET)
   if (cfg.labelMap) {
