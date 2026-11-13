@@ -79,6 +79,11 @@ One model takes a contrast-enhanced T1, the other a T2 (trained mostly on high-r
 such as CISS or FIESTA). They take the image as it is: no brain extraction, so with these models
 alone HD-BET is not run.
 
+![Vestibular schwannoma T2 add-on on the T2 of the model's example image](docs/vestibular-schwannoma.png)
+
+*The schwannoma T2 add-on on the example T2 that comes with the models (Zenodo record 10363647,
+CC BY 4.0), loaded on its own: 3.33 cm3, the same as the original nnU-Net to 1 voxel.*
+
 ![Raidionics FLAIR add-on run on the FLAIR of TCGA-DU-7294 alone](docs/raidionics-flair.png)
 
 *The Raidionics FLAIR add-on on the FLAIR of TCGA-DU-7294 (TCIA, CC BY 3.0) loaded on its own:
@@ -229,8 +234,8 @@ until IT approves them.
    runs once and each model adds its own time (all three models on the demo: 13.7 minutes). Each
    AURORA model took 5.5 minutes on a 1 mm image. The schwannoma models are slower, because they
    work at the resolution of thin-slice images: 29 minutes for the T1c model on its 0.41 x 0.41 x
-   1.5 mm example (75 patches)VST2TIME. More CPU cores, or a GPU through WebGPU, make it
-   considerably faster.
+   1.5 mm example (75 patches), 28 minutes for the T2 model on the T2 of that example (72
+   patches). More CPU cores, or a GPU through WebGPU, make it considerably faster.
 5. **Review.** Axial, coronal, sagittal (anterior to the left) or 3-plane view. Choose the
    background sequence, which model's labels (or the agreement map) are shown, the overlay
    opacity, crosshairs on or off, and which compartments are shown (click a colour swatch). The
@@ -282,7 +287,7 @@ brainles_aurora on the same 1 mm images, differs at 5 to 8 of 8.9 million voxels
 1.0, edema 0.9999); run on BraTS-style files in the browser, metastasis Dice 0.9998 and edema 0.997
 against AURORA on the files themselves. The schwannoma T1c add-on differs from the original
 nnU-Net v2 predictor at 2 of 16.4 million voxels on the model's example image (Dice 0.99993;
-3.761 cm3 on both sides)VST2README.
+3.761 cm3 on both sides), the T2 add-on at 1 voxel (Dice 0.99996; 3.329 vs 3.328 cm3).
 
 **Weight precision.** HD-GLIO and HD-BET are stored as 8-bit integers per output channel and
 restored to 32-bit floating point at load, which keeps the executable under GitHub's 100 MB file

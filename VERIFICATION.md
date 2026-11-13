@@ -7,6 +7,8 @@ README screenshot). Section 6 covers v1.2.0 (2026-11-09): the Raidionics FLAIR a
 runs with fewer than four sequences; HD-GLIO and the BraTS add-on were re-run and are unchanged.
 Section 7 covers v1.3.0 (2026-11-09): several models in one run, and their comparison.
 Section 8 covers v1.4.0 (2026-11-13): the Raidionics tumor core add-on.
+Section 9 covers v1.5.0 (2026-11-13): the AURORA brain metastasis and vestibular schwannoma
+add-ons, and runs without brain extraction when only whole-head models are checked.
 Test machine: Linux container, 2 CPU cores, 7 GB RAM, no GPU,
 headless Chrome. Unless stated otherwise the case is TCGA-FG-6692 (the built-in demo: 2D axial
 T1, T1c, T2, FLAIR, 0.9 x 0.9 x 5.5 mm).
@@ -385,6 +387,161 @@ next to it (all three listed), gave the same DU-7294 T1c-only segmentation as th
 voxel for voxel, with no request leaving the computer. The BraTS and Raidionics FLAIR add-on files
 built by 1.4.0 are byte-identical to the published ones.
 
+## 9. Version 1.5.0: AURORA brain metastasis and vestibular schwannoma add-ons
+
+### 9a. AURORA
+
+**Models.** AURORA weights v1.0.0 from Zenodo (record 10557069, CC BY 4.0): `t1c-o_best.tar`
+(T1c only, md5 5cbb214b74196c985bde38401e0474df) and `t1c-fla_best.tar` (T1c + FLAIR, md5
+5037c42da1a6067f3c1f193924fa7083), as listed in the record. Each is a MONAI BasicUNet (features
+32, 32, 64, 128, 256, 32; mish; instance norm) built as brainles_aurora 0.2.7 builds it; the
+checkpoints load with `torch.load(weights_only=True)`. For the export the mish activation is
+written as x * u / (u + 2) with u = e^x (e^x + 2) (e^x of min(x, 20)), which is the same function
+with only elementary operators that ONNX Runtime Web runs on the GPU; on a random 192 x 192 x 32
+input the exporter checks that the logits match the original module (largest difference below
+1e-3, asserted). UpCat's padding, a no-op for windows divisible by 16, is left out of the graph.
+
+**What brainles_aurora does, and the workbench.**
+
+| Step | brainles_aurora 0.2.7 (MONAI) | Workbench (`app/js/lib/aurora.js`) |
+|---|---|---|
+| Input | The files as given (expected: brain-extracted, 1 mm, BraTS space) | The HD-BET-masked, registered images on a 1 mm grid in BraTS axis order (i left, j posterior, k superior), 240 x 240 x 155: the reference's own frame when it already is one; else centred on the brain, on the reference's voxels when it is 1 mm and axis-aligned (copied), otherwise linearly resampled |
+| Intensities | `ScaleIntensityRangePercentiles(0.5, 99.5, 0, 1, clip, channel_wise)` | Same (numpy's linear percentile, float32 arithmetic) |
+| Inference | `SlidingWindowInferer(192 x 192 x 32, overlap 0.5, gaussian, sigma 0.125, replicate padding)` | Same window positions, Gaussian weights (clamped at 0.001) and normalisation |
+| Augmentation (default on) | Mean logits of 13 passes: as is; 4 with Gaussian noise (std 0.001); 4 x 2 with the noisy image flipped on axis 1 or 2 | Off by default; with it on, 3 passes weighted 5 : 4 : 4 (the 13 without the noise) |
+| Output | sigmoid >= 0.5; whole lesion -> 1, metastasis -> 2 | Same, after linear resampling of the probabilities back to the reference grid |
+
+The BraTS axis order was taken from the AURORA example data: its arrays have the frontal lobes at
+low j and the vertex at high k, the layout of BraTS images (whose header orientation is LPS).
+The example files themselves carry an identity orientation (RAS) that does not match their
+anatomy, so for the workbench tests they were given the BraTS orientation (diag(-1, -1, 1),
+arrays unchanged); brainles_aurora, which ignores the orientation, was given the original files.
+
+**Implementation, identical inputs (Node, onnxruntime-node, shipped 16-bit weights, against
+brainles_aurora with the fp32 weights).** `test/unit/aurora_test.mjs` runs `aurora.js` on the T1c of
+the AURORA example (BraTS-METS sample, 240 x 240 x 155 at 1 mm, brain mask = its nonzero voxels) and
+writes the images on its 1 mm grid; `test/validate/compare_aurora.py` gives those files to
+`AuroraInferer` (weights read from the local folder, nothing downloaded) and compares the sigmoid
+probabilities and labels. Here the 1 mm grid falls on the input's own voxels (240 x 240 x 155, 36
+windows), so the input-grid labels correspond voxel for voxel.
+
+| T1c model, input and frame | Max abs probability diff (whole / metastasis) | Differing voxels | Metastasis cm3, workbench / AURORA (Dice) | Edema cm3 (Dice) |
+|---|---|---|---|---|
+| 1 mm, frame centred on the brain, no augmentation | 0.0027 / 0.0026 | 5 of 8,928,000 | 51.888 / 51.888 (1.0) | 47.346 / 47.349 (0.99995) |
+| Same, augmentation: workbench 3 passes, AURORA 13 with its noise set to 0 | 0.0014 / 0.0024 | 2 of 8,928,000 | 51.877 / 51.877 (1.0) | 47.586 / 47.584 (0.99998) |
+| 1 mm, the file's own 240 x 240 x 155 frame (AURORA given the file itself), no augmentation | - | 8 of 8,928,000 | 51.796 / 51.796 (1.0) | 47.076 / 47.078 (0.99992) |
+| Oblique copy: 0.94 x 0.94 x 3 mm, axes turned 10 degrees, resampled to the 1 mm grid, no augmentation | 0.0039 / 0.0030 | 8 of 8,928,000 (1 mm grid) | 53.174 / 53.173 (0.99999) | 49.071 / 49.073 (0.99992) |
+
+**The frame matters to AURORA itself.** The first two rows used a 240 x 240 x 155 frame centred on
+the brain's bounding box, which for this image sits 9 and 4 voxels away from the file's own frame
+(j and k). AURORA's own result on the same image in those two frames differs: Dice 0.9956 for the
+metastasis (51.80 vs 51.89 cm3), 0.972 for edema (47.08 vs 47.35 cm3), because the sliding
+windows then fall on different voxels. The workbench therefore uses a reference that already is
+such a box (1 mm, 240 x 240 x 155 along the BraTS axes, as BraTS-preprocessed images are) as it
+is, and centres the frame on the brain only for other references; the third row is that case.
+
+**Resampling path.** For the oblique copy (rotated 10 degrees about the superior axis, 3 mm
+slices, made with linear interpolation from the example) the 1 mm grid is resampled, so the
+labels on the oblique grid come from linearly resampled probabilities; against AURORA's
+internal-grid labels taken by nearest voxel they agree with Dice 0.992 (metastasis) and 0.967
+(edema), the difference between the two ways of going back. Against AURORA on the original 1 mm
+image, the 3 mm result has 53.34 vs 51.80 cm3 of metastasis (Dice 0.961 on the 1 mm grid): what
+3 mm slices cost, not a fault of the pipeline.
+
+**Workbench (browser, WebAssembly, shipped add-on files)**, both AURORA models in one run on the
+four example files (T1, T1c, T2, FLAIR on one 1 mm grid; registration switched off automatically),
+against `test/validate/aurora_end_to_end.py`: brainles_aurora on the T1c (and FLAIR) files as they
+are.
+
+| Run | Model | Workbench cm3 (metastasis / edema) | AURORA cm3 | Differing voxels | Dice metastasis / edema |
+|---|---|---|---|---|---|
+| Brain extraction off, reference T1 | T1c | 51.81 / 47.01 | 51.80 / 47.08 | 274 of 8,928,000 | 0.99975 / 0.9971 |
+| Brain extraction off, reference T1 | T1c + FLAIR | 51.99 / 52.16 | 51.97 / 52.46 | 398 | 0.99952 / 0.99626 |
+| HD-BET on T1 (default), reference T1 | T1c | 51.82 / 46.96 | 51.80 / 47.08 | 285 | 0.99961 / 0.99697 |
+| HD-BET on T1 (default), reference T1 | T1c + FLAIR | 51.98 / 52.26 | 51.97 / 52.46 | 382 | 0.99926 / 0.9965 |
+
+In both runs the 1 mm grid is the files' own frame. With brain extraction off, the inputs are
+masked with the reference's nonzero voxels (as for skull-stripped inputs in general); in these
+files 7.1 cm3 of the T1c's and 25.2 cm3 of the FLAIR's nonzero voxels are zero in the T1, which
+accounts for the differences (the T1c-only run in Node with the T1c unmasked differed at 8 voxels,
+row 3 above). With HD-BET, its mask (1,570 cm3, against 1,618 cm3 of nonzero voxels in these
+already skull-stripped files) trims the inputs a little more, with the same effect on the result.
+For BraTS-preprocessed images, switching brain extraction off and registering to T1c gives
+AURORA exactly its own input. The default run also checked the model comparison
+(`check_model_comparison.py`: largest difference 0.00003 Dice; agreement map identical): T1c vs
+T1c + FLAIR metastasis Dice 0.973, whole lesion 0.890, the FLAIR model finding 13.8 cm3 of
+abnormality (edema) on its own.
+
+Run time on the 2-core test machine, CPU: 5.5 min per model without augmentation (36 windows of
+192 x 192 x 32), about 3 times that with it.
+
+### 9b. Vestibular schwannoma
+
+**Models.** From Zenodo record 10363647 (CC BY 4.0), `MC-RC+SC-GK-models.zip` (7.2 GB, md5
+551f187380b29efca49ddd97f7f9e969 as listed): `Dataset920_VSMCRCSCGKT1` (contrast-enhanced T1,
+404 training cases after the authors' balancing of the two datasets) and `Dataset921_VSMCRCSCGKT2`
+(T2, 487), nnU-Net v2, the `3d_fullres` configuration that nnU-Net selected for both (cross-validation
+Dice 0.913 and 0.870), network of fold 0. Only the files needed were read out of the archive, with
+HTTP range requests; Python's zipfile checks each against the archive's CRC-32. The checkpoints
+open with `torch.load(weights_only=True)` (plain tensors, numbers and numpy scalars only) before
+nnU-Net loads them. These combined-data models were chosen over the multi-centre-only ones
+(`Dataset910`/`911`) because the paper found them best on most test sets, clearly so for T1c.
+
+| | T1c (920) | T2 (921) |
+|---|---|---|
+| Target spacing (z, y, x) | 1.0 x 0.41 x 0.41 mm | 0.70 x 0.47 x 0.47 mm |
+| Patch | 64 x 192 x 160 | 40 x 256 x 224 |
+| Normalisation | z-score of the whole image (no mask) | same |
+| Mirroring at inference | axes 0, 1, 2 | same |
+
+They run through the same JavaScript nnU-Net code as the BraTS add-on and HD-BET (nnU-Net v2
+paths), with one change found while adding them: when the probabilities are resampled back to
+the input grid, nnU-Net v2 decides on separate-z resampling from the target spacing first and the
+input spacing second (v1 the other way round). The order only matters when both spacings are
+anisotropic (ratio above 3) along different axes, which the target spacings of these models and of
+HD-BET rule out, so no result changes (HD-GLIO and BraTS are v1). The inputs are not brain-extracted (`maskInput: false`), and
+when only such models are checked HD-BET does not run. The authors' Zenodo instructions say to
+omit nnU-Net's postprocessing, so none is applied (on cross-validation nnU-Net had chosen keeping
+the largest region, which changed the mean Dice by less than 0.001).
+
+**Agreement with nnU-Net v2 (browser, WebAssembly, shipped add-on file).** The example image of the
+model record (`example_input_images.zip`, a Gamma Knife planning contrast-enhanced T1, 416 x 488 x
+81 voxels of 0.41 x 0.41 x 1.5 mm, LPS) was loaded on its own as `vs_gk_ceT1.nii.gz`, a name the
+page assigns to T1c (under its own name, `vs_gk_0000.nii.gz`, nnU-Net's channel suffix makes the
+page take it for T1, which the drop-down corrects). HD-BET was not run. `test/validate/compare_vs.py` reorients the workbench's export of
+the image as the workbench does (LAS), runs `nnUNetPredictor` (PyTorch, CPU, fp32 checkpoint,
+fold 0, no mirroring, no postprocessing) and takes the result back:
+
+| Case | Workbench cm3 | nnU-Net v2 cm3 | Differing voxels | Dice |
+|---|---|---|---|---|
+| Example ceT1, T1c model | 3.761 | 3.761 | 2 of 16,443,648 | 0.99993 |
+| Example T2 (on the ceT1 grid), T2 model | 3.329 | 3.328 | 1 of 16,443,648 | 0.99996 |
+
+The workbench reorients every input to the MNI voxel order before the models see it (for this
+LPS file, a flip of the second axis), as HD-GLIO's instructions prescribe. Run on the file in its
+stored voxel order, as `nnUNetv2_predict` would, nnU-Net gave 3.753 cm3, Dice 0.990 against the
+reoriented run: the model is close to, but not exactly, invariant to that flip.
+
+The example T2 is resampled onto the ceT1 grid (1.5 mm slices), not a native thin-slice T2, so it
+tests the implementation rather than the T2 model's accuracy. It was loaded on its own with
+*Register to* T2 (the T2 model's run grid is then the T2 as given). The page recognised it from
+its name.
+
+Run time on the 2-core test machine, CPU, no augmentation: T1c model 29 min 12 s (75 patches of
+64 x 192 x 160 on a 122 x 488 x 416 grid at 1.0 x 0.41 x 0.41 mm), T2 model 27 min 57 s (72 patches
+of 40 x 256 x 224). The browser peaked at about 3 GB; with other memory-hungry programs running at
+the same time the test machine's 7 GB was not enough (the browser tab was stopped once and the run
+repeated alone).
+
+**Executable.** The 1.5.0 Linux build, run through its own launcher with the seven add-on files
+next to it (all seven listed), ran AURORA T1c on the example T1c alone (brain extraction off, so
+the input is the T1c itself) with no request leaving the computer: 51.81 cm3 of metastasis and
+47.10 of edema, 62 voxels different from brainles_aurora on the file (Dice 0.99988 metastasis,
+0.99935 edema; the Node run of the same input, row 3 of the first table, differed at 8: the
+browser's WebAssembly kernels round differently from Node's). The BraTS and both Raidionics add-on
+files built by 1.5.0 are byte-identical to the published ones, and the four new add-on files are
+the ones tested above.
+
 ## Run time
 
 Demo case on the 2-core test machine, CPU (WebAssembly), no augmentation: 9 min (HD-BET
@@ -396,3 +553,7 @@ time by 8: the same case with augmentation took 31 min 34 s (HD-GLIO 24 min 51 s
 Raidionics FLAIR add-on, same machine, CPU: DU-7294 FLAIR alone 7 min 27 s (HD-BET on the FLAIR
 6 min 47 s, Raidionics 39 s for 2 patches of 160^3); FG-6692 with all four sequences registered
 to FLAIR 5 min 23 s (HD-BET 2 min 19 s, registration 28 s, Raidionics 2 min 36 s for 8 patches).
+
+AURORA add-ons, same machine, CPU: about 5.5 min per model on a 1 mm 240 x 240 x 155 image (36
+windows of 192 x 192 x 32), after HD-BET (1 min 20 s there). Vestibular schwannoma add-ons: 28 to
+29 min on the 0.41 x 0.41 x 1.5 mm example (72 to 75 patches), with no HD-BET.
