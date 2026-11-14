@@ -429,8 +429,13 @@ windows), so the input-grid labels correspond voxel for voxel.
 |---|---|---|---|---|
 | 1 mm, frame centred on the brain, no augmentation | 0.0027 / 0.0026 | 5 of 8,928,000 | 51.888 / 51.888 (1.0) | 47.346 / 47.349 (0.99995) |
 | Same, augmentation: workbench 3 passes, AURORA 13 with its noise set to 0 | 0.0014 / 0.0024 | 2 of 8,928,000 | 51.877 / 51.877 (1.0) | 47.586 / 47.584 (0.99998) |
+| Same, augmentation: workbench 3 passes, AURORA as published (13 passes with its random noise) | 0.0080 / 0.0068 | 18 of 8,928,000 | 51.877 / 51.878 (0.99999) | 47.586 / 47.582 (0.99981) |
 | 1 mm, the file's own 240 x 240 x 155 frame (AURORA given the file itself), no augmentation | - | 8 of 8,928,000 | 51.796 / 51.796 (1.0) | 47.076 / 47.078 (0.99992) |
 | Oblique copy: 0.94 x 0.94 x 3 mm, axes turned 10 degrees, resampled to the 1 mm grid, no augmentation | 0.0039 / 0.0030 | 8 of 8,928,000 (1 mm grid) | 53.174 / 53.173 (0.99999) | 49.071 / 49.073 (0.99992) |
+
+Leaving out AURORA's noise (standard deviation 0.001 on images scaled to 0..1) changed its
+augmented result at 18 voxels here (one random draw of the noise; brainles_aurora's own result
+varies a little from run to run because of it).
 
 **The frame matters to AURORA itself.** The first two rows used a 240 x 240 x 155 frame centred on
 the brain's bounding box, which for this image sits 9 and 4 voxels away from the file's own frame
@@ -532,6 +537,10 @@ Run time on the 2-core test machine, CPU, no augmentation: T1c model 29 min 12 s
 of 40 x 256 x 224). The browser peaked at about 3 GB; with other memory-hungry programs running at
 the same time the test machine's 7 GB was not enough (the browser tab was stopped once and the run
 repeated alone).
+
+**Earlier models unchanged.** The v1.4.0 test run of TCGA-FG-6692 (all four sequences registered
+to T1c, HD-BET, nnU-Net BraTS and Raidionics tumor core) repeated with 1.5.0 gave the same brain
+mask, inputs, segmentations and agreement map voxel for voxel, and the same CSV.
 
 **Executable.** The 1.5.0 Linux build, run through its own launcher with the seven add-on files
 next to it (all seven listed), ran AURORA T1c on the example T1c alone (brain extraction off, so

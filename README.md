@@ -218,8 +218,8 @@ until IT approves them.
      Raidionics, which does not use it. AURORA's own augmentation averages 13 passes: the image as
      is, 4 times with a little Gaussian noise (standard deviation 0.001 of the intensity range) and
      4 times each flipped on two axes. Without the noise these are 5 identical passes and 4 + 4
-     flipped ones, so the workbench runs 3 passes weighted 5 : 4 : 4 (see VERIFICATION.md for how
-     close that is).
+     flipped ones, so the workbench runs 3 passes weighted 5 : 4 : 4. Against AURORA's own
+     augmentation, noise included, that differed at 18 of 8.9 million voxels on the example.
    - With a Raidionics model, register to its input sequence (FLAIR, or T1c for the tumor core
      model) with the grid as acquired to run it exactly as Raidionics does (the page says so when
      another choice is made). When it runs together with other models, all of them are then on
