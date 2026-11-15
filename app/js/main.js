@@ -30,7 +30,13 @@ worker.onmessage = ev => {
   else if (m.type === 'models') onModels(m);
   else if (m.type === 'progress') onProgress(m);
   else if (m.type === 'result') onResult(m);
-  else if (m.type === 'export') { const f = pendingExports.get(m.id); pendingExports.delete(m.id); download(m.name, new Blob([m.bytes], { type: 'application/gzip' })); if (f) f(); }
+  else if (m.type === 'export') {
+    const f = pendingExports.get(m.id); pendingExports.delete(m.id);
+    download(m.name, new Blob([m.bytes], { type: 'application/gzip' }));
+    // the segmentation's sidecar for BrainTumIQ, saved next to it
+    if (m.sidecar) setTimeout(() => download(m.sidecar.name, new Blob([m.sidecar.text], { type: 'application/json' })), 300);
+    if (f) f();
+  }
   else if (m.type === 'agreement') onAgreement(m);
   else if (m.type === 'error') onError(m);
 };

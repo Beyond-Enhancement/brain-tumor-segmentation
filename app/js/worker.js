@@ -9,6 +9,7 @@ import { registerRigid } from './lib/register.js';
 import { predictCase, labelComponents } from './lib/nnunet.js';
 import { predictRaidionics } from './lib/raidionics.js';
 import { predictAurora } from './lib/aurora.js';
+import { maskSidecar, sidecarName } from './lib/sidecar.js';
 import { Network, gpuInfo, loadOrt } from './lib/ortrun.js';
 import { unzipSync, gunzipSync } from '../vendor/fflate.mjs';
 
@@ -544,11 +545,14 @@ function toOutputGrid(data, Ctor) {
 function doExport(what, reqId) {
   const R = state.result;
   if (!R) throw new Error('Nothing to export yet');
-  let vol, dtype = 'f32', name, descrip;
+  let vol, dtype = 'f32', name, descrip, sidecar = null;
   const byId = id => { const r = id ? R.results.find(x => x.cfg.id === id) : R.results[0]; if (!r) throw new Error('Model not in this run'); return r; };
   if (what === 'seg' || what.startsWith('seg:')) {
     const r = byId(what.slice(4));
     vol = toOutputGrid(r.seg, Uint8Array); dtype = 'u8'; name = r.cfg.id + '_segmentation.nii.gz'; descrip = (r.cfg.name || 'HD-GLIO').slice(0, 60) + ' segmentation';
+    // for BrainTumIQ: label meanings, the sequence whose grid this is, the brain mask, the model
+    const sc = maskSidecar({ model: r.cfg, vol, refRole: R.refRole, onReferenceGrid: R.gridIsNativeRef, brainMask: !!R.brain && usesBrain(r.cfg) });
+    sidecar = { name: sidecarName(name), text: JSON.stringify(sc, null, 2) + '\n' };
   } else if (what.startsWith('agree:')) {
     const [, a, b, region] = what.split(':');
     vol = toOutputGrid(agreementMap(a, b, region), Uint8Array); dtype = 'u8'; name = 'agreement_' + a + '_vs_' + b + '_' + region + '.nii.gz';
@@ -568,7 +572,7 @@ function doExport(what, reqId) {
     vol = toOutputGrid(R.onRef[r], Float32Array); name = 'registered_' + r.toLowerCase() + '.nii.gz'; descrip = r + ' registered to ' + R.refRole;
   } else throw new Error('Unknown export ' + what);
   const bytes = writeNifti(vol, { dtype, gz: true, descrip });
-  post('export', { id: reqId, name, bytes: bytes.buffer }, [bytes.buffer]);
+  post('export', { id: reqId, name, bytes: bytes.buffer, sidecar }, [bytes.buffer]);
 }
 
 function postAgreement(a, b, region, reqId) {
