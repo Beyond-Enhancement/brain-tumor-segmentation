@@ -95,10 +95,23 @@ const exps = await page.$$eval('[data-exp]', bs => bs.filter(b => !b.hidden).map
 for (const what of exps) {
   if (errToast.length) break;
   if (await page.$eval(`[data-exp="${what}"]`, b => b.disabled)) continue;
-  const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 60000 }), page.click(`[data-exp="${what}"]`)]);
-  const p = path.join(out, dl.suggestedFilename());
-  await dl.saveAs(p);
-  exported[what] = { file: path.basename(p), bytes: fs.statSync(p).size };
+  // a segmentation comes with its sidecar (.json, for BrainTumIQ): two downloads
+  const want = what.startsWith('seg') ? 2 : 1, got = [];
+  const done = new Promise((resolve, reject) => {
+    const on = d => { got.push(d); if (got.length === want) { clearTimeout(t); page.off('download', on); resolve(); } };
+    const t = setTimeout(() => { page.off('download', on); reject(new Error(`export ${what}: ${got.length} of ${want} downloads`)); }, 60000);
+    page.on('download', on);
+  });
+  await page.click(`[data-exp="${what}"]`);
+  await done;
+  const files = [];
+  for (const dl of got) { const p = path.join(out, dl.suggestedFilename()); await dl.saveAs(p); files.push(p); }
+  exported[what] = { file: path.basename(files[0]), bytes: fs.statSync(files[0]).size };
+  if (files[1]) {
+    const sc = JSON.parse(fs.readFileSync(files[1], 'utf8'));
+    exported[what].sidecar = { file: path.basename(files[1]), labels: sc.labels || null, source_sequence: sc.source_sequence,
+      shape: sc.geometry.shape, brain_mask: sc.brain_mask || null, model: sc.model.name };
+  }
 }
 const [csv] = errToast.length ? [null] : await Promise.all([page.waitForEvent('download'), page.click('#csvBtn')]);
 if (csv) await csv.saveAs(path.join(out, csv.suggestedFilename()));

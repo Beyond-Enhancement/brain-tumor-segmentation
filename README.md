@@ -247,7 +247,41 @@ until IT approves them.
    model and AURORA got them; with Raidionics or a schwannoma model alone, the image as given to
    it, which is not brain-extracted; other sequences as registered). Files are on
    the reference grid with the same voxel order and orientation as the reference series that was
-   loaded, so they overlay it in any viewer.
+   loaded, so they overlay it in any viewer. Each segmentation comes with a small `.json`
+   sidecar of the same name for [BrainTumIQ](#using-the-results-in-braintumiq) (the browser may
+   ask once whether the page may download several files).
+
+## Using the results in BrainTumIQ
+
+[BrainTumIQ](https://github.com/Beyond-Enhancement/BrainTumIQ) (volumetry, advanced-map
+parameters, habitats and radiomics) imports the segmentations of this workbench. The sidecar
+(`hdglio_segmentation.json` next to `hdglio_segmentation.nii.gz`, and so on) tells it:
+
+- what each label means in its compartments (NCR, ED, ET);
+- which sequence the mask is on (the *Register to* sequence), so that BrainTumIQ can check the
+  mask's voxel grid against the images it has loaded and, if its own reference is another
+  sequence, bring the mask over with its own registration;
+- the brain mask (`hdbet_brain_mask.nii.gz`, when the model used it);
+- the model and the workbench version, for BrainTumIQ's provenance file.
+
+Save the segmentation, its `.json` and the brain mask in one folder and add that folder in
+BrainTumIQ together with the images. Load the same image files in both programs (or the same
+DICOM series), and keep *Grid* at *as acquired*: a segmentation on the 1 mm grid is not on the
+voxels of any loaded image, so BrainTumIQ then asks for resampling in scanner coordinates.
+
+| Model | Labels in BrainTumIQ |
+|---|---|
+| HD-GLIO | 1 ED, 2 ET |
+| nnU-Net BraTS 2020 | 1 NCR, 2 ED, 4 ET |
+| Raidionics FLAIR hyperintensity | 1 ED |
+| Raidionics tumor core | 1 CORE |
+| AURORA (T1c, T1c + FLAIR) | 1 ED, 2 CORE |
+| Vestibular schwannoma (T1c, T2) | 1 CORE |
+
+CORE is BrainTumIQ's undivided tumor core (BrainTumIQ 0.2.0 or later): tumor that the model
+labels as one region, enhancing tissue and necrosis together. BrainTumIQ counts it in the whole
+tumor and the tumor core but never as enhancing tumor or necrosis, so its enhancing-tumor volumes
+and statistics stay enhancing tissue only.
 
 ## Troubleshooting
 
@@ -372,6 +406,8 @@ otherwise multi-threaded WebAssembly on the CPU.
   add-on files in its own folder, by exact name.
 - Output files contain no DICOM header information: file names are fixed
   (`hdglio_segmentation.nii.gz`, ...) and the NIfTI description field names only the content.
+  The `.json` sidecars hold only the label meanings, the reference sequence, the voxel grid,
+  the model and the workbench version.
 
 See [VERIFICATION.md](VERIFICATION.md) for the method and results.
 
@@ -432,6 +468,7 @@ node test/e2e.mjs http://127.0.0.1:8771/ test/out/e2e-vs --files ceT1.nii.gz --m
 python3 test/validate/compare_vs.py <Dataset920 3d_fullres folder> test/out/e2e-vs/vs-t1c_input_t1c.nii.gz test/out/e2e-vs/vs-t1c_segmentation.nii.gz   # vs nnU-Net v2
 node test/gpu_loss_test.mjs http://127.0.0.1:47821/ test/out/gpu-loss   # GPU reset mid-run -> CPU fallback
 node test/unit/roles_test.mjs                       # sequence assignment from file names
+node test/unit/sidecar_test.mjs                     # the BrainTumIQ sidecar of each segmentation
 ```
 
 ## Repository layout

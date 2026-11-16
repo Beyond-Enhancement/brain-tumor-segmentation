@@ -9,7 +9,7 @@
 # The models must have been exported first (build/export_models.py).
 set -euo pipefail
 cd "$(dirname "$0")/.."
-VERSION="1.5.0"  # keep in sync with appVer in launcher/main.go
+VERSION="1.6.0"  # keep in sync with appVer in launcher/main.go and APP_VERSION in app/js/version.js
 NAME="Brain Tumor Segmentation Workbench"
 
 python3 build/prepare_site.py
