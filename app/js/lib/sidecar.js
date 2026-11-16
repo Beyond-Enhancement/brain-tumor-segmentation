@@ -3,15 +3,20 @@
 // which image the mask is on. Format: https://github.com/Beyond-Enhancement/BrainTumIQ, docs/mask-sidecar.md
 import { APP_VERSION } from '../version.js';
 
-// Workbench label value -> BrainTumIQ compartment (NCR necrosis / non-enhancing core, ED edema /
-// FLAIR hyperintensity, ET enhancing tumor). Only models whose labels map onto those compartments
-// one to one are listed. The others label a tumor core (enhancing tissue together with necrosis)
-// or a whole lesion, which BrainTumIQ has no compartment for: their sidecar carries no labels and
-// the label convention is chosen when importing.
+// Workbench label value -> BrainTumIQ compartment: NCR necrosis / non-enhancing core, ED edema /
+// FLAIR hyperintensity, ET enhancing tumor, CORE undivided tumor core (enhancing tissue and
+// necrosis labelled as one, or a whole lesion; counted in BrainTumIQ's whole tumor and tumor core
+// but never as enhancing tumor or necrosis). Every model of the workbench is listed; a model
+// missing here would get a sidecar without labels, and its convention would be chosen at import.
 export const BRAINTUMIQ_LABELS = {
   hdglio: { 1: 'ED', 2: 'ET' },              // 1 non-enhancing T2/FLAIR abnormality, 2 contrast-enhancing
   brats2020: { 1: 'NCR', 2: 'ED', 4: 'ET' }, // BraTS convention
   'raidionics-flair': { 1: 'ED' },           // FLAIR hyperintensity (tumor and edema)
+  'raidionics-core': { 1: 'CORE' },          // tumor core: enhancing tissue, necrosis, cysts
+  'aurora-t1c': { 1: 'ED', 2: 'CORE' },      // 2 metastasis: enhancing tumor and necrosis
+  'aurora-t1c-flair': { 1: 'ED', 2: 'CORE' },
+  'vs-t1c': { 1: 'CORE' },                   // whole schwannoma
+  'vs-t2': { 1: 'CORE' },
 };
 
 export const TUMOR_TYPES = {

@@ -274,7 +274,14 @@ voxels of any loaded image, so BrainTumIQ then asks for resampling in scanner co
 | HD-GLIO | 1 ED, 2 ET |
 | nnU-Net BraTS 2020 | 1 NCR, 2 ED, 4 ET |
 | Raidionics FLAIR hyperintensity | 1 ED |
-| Raidionics tumor core, AURORA, vestibular schwannoma | not set: their tumor core (enhancing tissue with necrosis) or whole-lesion label has no BrainTumIQ compartment, so the label values are chosen when importing |
+| Raidionics tumor core | 1 CORE |
+| AURORA (T1c, T1c + FLAIR) | 1 ED, 2 CORE |
+| Vestibular schwannoma (T1c, T2) | 1 CORE |
+
+CORE is BrainTumIQ's undivided tumor core (BrainTumIQ 0.2.0 or later): tumor that the model
+labels as one region, enhancing tissue and necrosis together. BrainTumIQ counts it in the whole
+tumor and the tumor core but never as enhancing tumor or necrosis, so its enhancing-tumor volumes
+and statistics stay enhancing tissue only.
 
 ## Troubleshooting
 
